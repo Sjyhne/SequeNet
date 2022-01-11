@@ -1,6 +1,8 @@
 """
 Taken from: https://github.com/jakeret/unet/blob/master/src/unet/unet.py
 with added documentation and minor modification
+
+Adopted by Sander Jyhne
 """
 
 from typing import Optional, Union, Callable, List
