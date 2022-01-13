@@ -13,6 +13,8 @@ class ImageDataset:
         self.bsize = bsize
         self.img_size = img_size
 
+        self.image_ids = range(len(self.image_paths))
+
         self.image_batches, self.label_batches = self.generate_batches()
     
     def get_label_paths(self):

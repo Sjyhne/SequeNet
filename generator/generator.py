@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from datasets import ImageDataset
+from generator import ImageDataset
 
 import os
 
@@ -17,15 +17,12 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
     image_dataset_generator = lambda: (i for i in image_dataset)
 
     dataset = tf.data.Dataset.from_generator(
-        image_dataset_generator, 
-        output_signature=(
-            tf.TensorSpec(shape=(batch_size, heigth, width, 3), dtype=tf.uint8),
-            tf.TensorSpec(shape=(batch_size, heigth, width), dtype=tf.uint8)
-        ))
+        image_dataset_generator,
+        (tf.uint8, tf.uint8),
+        (tf.TensorShape([batch_size, heigth, width, 3]), tf.TensorShape([batch_size, heigth, width, 1]))
+    )
     
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
-
-    return dataset
+    return image_dataset
 
 if __name__ == "__main__":
 

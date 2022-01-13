@@ -23,7 +23,7 @@ import tensorflow.keras.backend as K
 import tensorflow.keras.layers as KL
 import tensorflow.keras.models as KM
 
-import maskrcnn_utils as utils
+from models import maskrcnn_utils as utils
 
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
@@ -1835,8 +1835,9 @@ class MaskRCNN():
             input_gt_boxes = KL.Input(
                 shape=[None, 4], name="input_gt_boxes", dtype=tf.float32)
             # Normalize coordinates
-            gt_boxes = KL.Lambda(lambda x: norm_boxes_graph(
-                x, K.shape(input_image)[1:3]))(input_gt_boxes)
+            #gt_boxes = KL.Lambda(lambda x: norm_boxes_graph(
+            #    x, K.shape(input_image)[1:3]))(input_gt_boxes)
+            gt_boxes = KL.Lambda(lambda x: norm_boxes_graph2(x))([input_gt_boxes,input_image])
             # 3. GT Masks (zero padded)
             # [batch, height, width, MAX_GT_INSTANCES]
             if config.USE_MINI_MASK:
@@ -1894,7 +1895,7 @@ class MaskRCNN():
             # TODO: can this be optimized to avoid duplicating the anchors?
             anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
             # A hack to get around Keras's bad support for constants
-            anchors = KL.Lambda(lambda x: tf.Variable(anchors), name="anchors")(input_image)
+            anchors = AnchorsLayer(anchors, name="anchors")(input_image)
         else:
             anchors = input_anchors
 
@@ -2133,10 +2134,9 @@ class MaskRCNN():
             layer = self.keras_model.get_layer(name)
             # print("AAAAAAAAA ", layer.output in self.keras_model.losses)
             # print("AAAAAAAAAA ", tf.constant(layer.output in self.keras_model.losses))
-            # print(str(self.keras_model.losses))
             # print(str(layer.output))
             # print("AAAAAAAAAAAA ", str(layer.output) in str(self.keras_model.losses))
-            loss = tf.reduce_mean(layer.output, keepdims=True) * self.config.LOSS_WEIGHTS.get(name, 1.)
+            loss = lambda: (tf.reduce_mean(layer.output, keepdims=True) * self.config.LOSS_WEIGHTS.get(name, 1.))
             self.keras_model.add_loss(loss)
             # tf.cond(tf.constant(layer.output in self.keras_model.losses), lambda: 1, lambda: self.keras_model.add_loss(tf.reduce_mean(layer.output, keepdims=True) * self.config.LOSS_WEIGHTS.get(name, 1.)))
             # tf.cond(tf.constant(layer.output in self.keras_model.losses), lambda: 1, lambda: self.keras_model.add_loss(tf.reduce_mean(layer.output, keepdims=True) * self.config.LOSS_WEIGHTS.get(name, 1.)))
@@ -2153,7 +2153,7 @@ class MaskRCNN():
             keras.regularizers.l2(self.config.WEIGHT_DECAY)(w) / tf.cast(tf.size(w), tf.float32)
             for w in self.keras_model.trainable_weights
             if 'gamma' not in w.name and 'beta' not in w.name]
-        self.keras_model.add_loss(tf.add_n(reg_losses))
+        self.keras_model.add_loss(lambda: tf.add_n(reg_losses))
 
         # Compile
         self.keras_model.compile(
@@ -2238,7 +2238,7 @@ class MaskRCNN():
         # Directory for training logs
 #        self.log_dir = os.path.join(self.model_dir, "{}{:%Y%m%dT%H%M}".format(
 #            self.config.NAME.lower(), now))
-        self.log_dir = "//logdir//train"
+        self.log_dir = "/home/sj/masterthesis/segmask_processing/logs"
 
         # Path to save after each epoch. Include placeholders that get filled by Keras.
         self.checkpoint_path = os.path.join(self.log_dir, "mask_rcnn_{}_*epoch*.h5".format(
@@ -2810,6 +2810,13 @@ def norm_boxes_graph(boxes, shape):
     shift = tf.constant([0., 0., 1., 1.])
     return tf.divide(boxes - shift, scale)
 
+def norm_boxes_graph2(x):
+
+    boxes,tensor_for_shape = x
+    shape = tf.shape(tensor_for_shape)[1:3]
+
+    return norm_boxes_graph(boxes,shape)
+
 
 def denorm_boxes_graph(boxes, shape):
     """Converts boxes from normalized coordinates to pixel coordinates.
@@ -2825,6 +2832,17 @@ def denorm_boxes_graph(boxes, shape):
     shift = tf.constant([0., 0., 1., 1.])
     return tf.cast(tf.round(tf.multiply(boxes, scale) + shift), tf.int32)
 
+class AnchorsLayer(KL.Layer):
+    def __init__(self, anchors, name="anchors", **kwargs):
+        super(AnchorsLayer, self).__init__(name=name, **kwargs)
+        self.anchors = tf.Variable(anchors)
+
+    def call(self, dummy):
+        return self.anchors
+
+    def get_config(self):
+        config = super(AnchorsLayer, self).get_config()
+        return config
 
 if __name__ == "__main__":
     from maskrcnn_config import Config

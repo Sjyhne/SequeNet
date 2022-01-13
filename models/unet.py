@@ -15,7 +15,7 @@ from tensorflow.keras import losses
 from tensorflow.keras.initializers import TruncatedNormal
 from tensorflow.keras.optimizers import Adam
 
-from metrics import metrics as metric
+from models import metrics as metric
 
 class ConvBlock(layers.Layer):
 
