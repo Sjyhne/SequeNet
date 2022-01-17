@@ -202,8 +202,8 @@ def build_model(nx: Optional[int] = None,
                       padding=padding)(x)
 
     x = layers.Activation(activation)(x)
-    outputs = layers.Activation("softmax", name="outputs")(x)
-    model = Model(inputs, outputs, name="unet")
+    #outputs = layers.Activation("softmax", name="outputs")(x)
+    model = Model(inputs, x, name="unet")
 
     return model
 
