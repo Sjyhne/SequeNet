@@ -25,14 +25,14 @@ def train_step(m, x, y, loss_func, optimizer):
     # Run one step of gradient descent by updating
     # the value of the variables to minimize the loss.
     optimizer.apply_gradients(zip(grads, m.trainable_weights))
-    return loss_val
+    return loss_val, logits
 
 #add this for speedy execution (Not eager)
 #@tf.function
 def evaluate_step(m, x, y, loss_func):
     logits = m(x, training=False)
     loss_val = loss_func(y, logits)
-    return loss_val
+    return loss_val, logits
 
 
 if __name__ == "__main__":
@@ -49,14 +49,34 @@ if __name__ == "__main__":
 
     m = finalize_model(build_model(512, 512, 3, 1), optimizer=optimizer)
 
+    # Prepare the metrics.
+    train_loss_metric = tf.keras.metrics.BinaryCrossentropy()
+    val_loss_metric = tf.keras.metrics.BinaryCrossentropy()
+    train_iou_metric = tf.keras.metrics.BinaryIoU()
+    val_iou_metric = tf.keras.metrics.BinaryIoU()
+
     epochs = 2
 
     for epoch in range(epochs):
         print(f"Starting to train for {epochs} epochs")
 
         for step, (imgs, anns) in enumerate(train_ds):
-            loss = train_step(m, imgs, anns, bce, optimizer)
+            loss, logits = train_step(m, imgs, anns, bce, optimizer)
+            train_loss_metric.update_state(anns, logits)
+            train_iou_metric.update_state(anns, logits)
         
         for imgs, anns in val_ds:
-            loss = evaluate_step(m, imgs, anns, bce)
+            loss, logits = evaluate_step(m, imgs, anns, bce)
+            val_loss_metric.update_state(anns, logits)
+            val_iou_metric.update_state(anns, logits)
 
+
+        # Display metrics at the end of each epoch.
+        train_loss = train_loss_metric.result()
+        print("Train loss: %.4f | Train IoU: %.4f | Val loss: %.4f | Val IoU: %.4f" % (float(train_loss),))
+
+        # Reset training metrics at the end of each epoch
+        train_loss_metric.reset_states()
+        train_iou_metric.reset_states()
+        val_loss_metric.reset_states()
+        val_iou_metric.reset_states()
