@@ -11,8 +11,29 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import os
+#add this for speedy execution (Not eager)
+#@tf.function
 
-# TODO: Create dataset using the dataset in the maskrcnn utils file ---->  Atleast for the maskrcnn training, maybe use it for everything else aswell
+def train_step(m, x, y, loss_func, optimizer):
+    with tf.GradientTape as tape:
+        logits = m(x, training=True)
+        loss_val = loss_func(y, logits)
+
+    # Use the gradient tape to automatically retrieve
+    # the gradients of the trainable variables with respect to the loss.
+    grads = tape.gradient(loss_val, m.trainable_weights)
+    # Run one step of gradient descent by updating
+    # the value of the variables to minimize the loss.
+    optimizer.apply_gradients(zip(grads, m.trainable_weights))
+    return loss_val
+
+#add this for speedy execution (Not eager)
+#@tf.function
+def evaluate_step(m, x, y, loss_func):
+    logits = m(x, training=False)
+    loss_val = loss_func(y, logits)
+    return loss_val
+
 
 if __name__ == "__main__":
     
@@ -23,7 +44,8 @@ if __name__ == "__main__":
     test_ds = create_dataset_generator(dpath, "test", batch_size=1)
 
 
-    optimizer = tf.keras.optimizers.Adam()
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+    bce = tf.keras.losses.BinaryCrossentropy(logits=True)
 
     m = finalize_model(build_model(512, 512, 3, 1), optimizer=optimizer)
 
@@ -33,27 +55,8 @@ if __name__ == "__main__":
         print(f"Starting to train for {epochs} epochs")
 
         for step, (imgs, anns) in enumerate(train_ds):
-            print("imgs dim:", imgs.shape, "| anns dim:", anns.shape)
-            with tf.GradientTape() as tape:
-
-                logits = m(imgs, training=True)
-
-                sigmoid_logits = tf.math.sigmoid(logits)
-
-                bce = tf.keras.losses.BinaryCrossentropy(
-                    from_logits=False
-                )
-
-                bce_loss = bce(anns, sigmoid_logits)
-
-                print("bce_loss:", bce_loss)
-
-            # Use the gradient tape to automatically retrieve
-            # the gradients of the trainable variables with respect to the loss.
-            grads = tape.gradient(bce_loss, m.trainable_weights)
-
-            # Run one step of gradient descent by updating
-            # the value of the variables to minimize the loss.
-            optimizer.apply_gradients(zip(grads, m.trainable_weights))
-
+            loss = train_step(m, imgs, anns, bce, optimizer)
+        
+        for imgs, anns in val_ds:
+            loss = evaluate_step(m, imgs, anns, bce)
 
