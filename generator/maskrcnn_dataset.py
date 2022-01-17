@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 from models import Dataset
 from models.maskrcnn_utils import extract_bboxes
 
-from pycocotools import mask as maskUtils
-
 import numpy as np
 import tensorflow as tf
 
