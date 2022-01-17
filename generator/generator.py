@@ -22,7 +22,7 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
         (tf.TensorShape([batch_size, heigth, width, 3]), tf.TensorShape([batch_size, heigth, width, 1]))
     )
     
-    return dataset
+    return dataset, len(image_dataset)
 
 if __name__ == "__main__":
 

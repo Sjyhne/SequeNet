@@ -1,1 +1,0 @@
-from .simpleconfig import SimpleConfig

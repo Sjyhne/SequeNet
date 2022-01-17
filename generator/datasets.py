@@ -13,8 +13,6 @@ class ImageDataset:
         self.bsize = bsize
         self.img_size = img_size
 
-        self.image_ids = range(len(self.image_paths))
-
         self.image_batches, self.label_batches = self.generate_batches()
     
     def get_label_paths(self):
@@ -53,7 +51,7 @@ class ImageDataset:
         return image_batch_paths, label_batch_paths
 
     def __len__(self):
-        return np.ceil(len(self.image_paths) / self.bsize)
+        return int(np.ceil(len(self.image_paths) / self.bsize))
     
     def __getitem__(self, idx):
         image_paths = self.image_batches[idx]
