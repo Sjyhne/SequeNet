@@ -20,6 +20,11 @@ class SimpleConfig(Config):
         # the large side, and that determines the image shape.
         IMAGE_MIN_DIM = 512
         IMAGE_MAX_DIM = 512
+        IMAGE_MIN_SCALE = 0
+
+        USE_MINI_MASK = False
+
+        IMAGE_RESIZE_MODE = "none"
 
         # Use smaller anchors because our image and objects are small
         RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor side in pixels

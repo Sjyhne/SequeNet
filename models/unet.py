@@ -15,7 +15,8 @@ from tensorflow.keras import losses
 from tensorflow.keras.initializers import TruncatedNormal
 from tensorflow.keras.optimizers import Adam
 
-from models import metrics as metric
+from models.metrics import mean_iou as mi
+from models.metrics import dice_coefficient as dc
 
 class ConvBlock(layers.Layer):
 
@@ -148,7 +149,7 @@ def build_model(nx: Optional[int] = None,
                 kernel_size: int = 3,
                 pool_size: int = 2,
                 dropout_rate: int = 0.5,
-                padding:str="valid",
+                padding:str="same",
                 activation:Union[str, Callable]="relu") -> Model:
     """
     Constructs a U-Net model
@@ -277,10 +278,10 @@ def finalize_model(model: Model,
                    ]
 
     if mean_iou:
-        metrics += [metric.mean_iou]
+        metrics += [mi]
 
     if dice_coefficient:
-        metrics += [metric.dice_coefficient]
+        metrics += [dc]
 
     if auc:
         metrics += [tf.keras.metrics.AUC()]

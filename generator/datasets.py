@@ -59,12 +59,12 @@ class ImageDataset:
         image_paths = self.image_batches[idx]
         label_paths = self.label_batches[idx]
         imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
-        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1]))
+        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 1))
         for i in range(self.bsize):
             img = cv.imread(image_paths[i], cv.IMREAD_COLOR)
             lab = cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE)
             imgs[i] = img
-            labs[i] = lab
+            labs[i] = lab.reshape(self.img_size[0], self.img_size[1], 1)
         
         tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.uint8)
         tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)

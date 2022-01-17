@@ -1734,6 +1734,10 @@ def data_generator(dataset, config, shuffle=True, augment=False, augmentation=No
             batch_rpn_match[b] = rpn_match[:, np.newaxis]
             batch_rpn_bbox[b] = rpn_bbox
             batch_images[b] = mold_image(image.astype(np.float32), config)
+            print("b:", b)
+            print("gt_class_ids.shape:", gt_class_ids.shape)
+            print("gt_class_ids.shape:", gt_class_ids.shape)
+            print(batch_gt_class_ids.shape)
             batch_gt_class_ids[b, :gt_class_ids.shape[0]] = gt_class_ids
             batch_gt_boxes[b, :gt_boxes.shape[0]] = gt_boxes
             batch_gt_masks[b, :, :, :gt_masks.shape[-1]] = gt_masks
@@ -2281,6 +2285,8 @@ class MaskRCNN():
         """
         assert self.mode == "training", "Create model in training mode."
 
+        print("Train dataset:", train_dataset)
+
         # Pre-defined layer regular expressions
         layer_regex = {
             # all layers but the backbone
@@ -2302,6 +2308,8 @@ class MaskRCNN():
                                          no_augmentation_sources=no_augmentation_sources)
         val_generator = data_generator(val_dataset, self.config, shuffle=True,
                                        batch_size=self.config.BATCH_SIZE)
+
+        print("train_generator:", train_generator)
 
         # Create log_dir if it does not exist
         if not os.path.exists(self.log_dir):

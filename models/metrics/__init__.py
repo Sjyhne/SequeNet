@@ -1,1 +1,1 @@
-import models.metrics
+from .metrics import mean_iou, dice_coefficient
