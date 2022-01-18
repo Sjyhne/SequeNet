@@ -201,7 +201,7 @@ def build_model(nx: Optional[int] = None,
                       strides=1,
                       padding=padding)(x)
 
-    x = layers.Activation(activation)(x)
+    #x = layers.Activation(activation)(x)
     #outputs = layers.Activation("softmax", name="outputs")(x)
     model = Model(inputs, x, name="unet")
 
@@ -297,3 +297,4 @@ if __name__ == "__main__":
     m = finalize_model(build_model())
 
     print(m.summary())
+    print(len(m.trainable_weights))

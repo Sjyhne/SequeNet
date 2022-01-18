@@ -1,1 +1,1 @@
-from .metrics import mean_iou, dice_coefficient
+from .metrics import mean_iou, dice_coefficient, boundary_iou

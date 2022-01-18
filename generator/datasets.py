@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.keras.utils import to_categorical
 import numpy as np
 import cv2 as cv
 
@@ -15,11 +16,15 @@ class ImageDataset:
 
         self.image_batches, self.label_batches = self.generate_batches()
     
+    def get_label_path(self, path):
+        tmp = path.split("/")
+        path = os.path.join("/".join(tmp[:2]), "ann_dir", "/".join(tmp[3:]))
+        return path
+    
     def get_label_paths(self):
         label_paths = []
         for path in self.image_paths:
-            tmp = path.split("/")
-            path = os.path.join("/".join(tmp[:2]), "ann_dir", "/".join(tmp[3:]))
+            path = self.get_label_path(path)
             label_paths.append(path)
         
         assert len(label_paths) == len(self.image_paths)
@@ -42,8 +47,10 @@ class ImageDataset:
         
         if len(tmp_image_batch) != 0:
             for i in range(self.bsize - len(tmp_image_batch)):
-                tmp_image_batch.append(random.choice(self.image_paths))
-                tmp_label_batch.append(random.choice(self.label_paths))
+                img_path = random.choice(self.image_paths)
+                lab_path = self.get_label_path(img_path)
+                tmp_image_batch.append(img_path)
+                tmp_label_batch.append(lab_path)
             
             image_batch_paths.append(tmp_image_batch)
             label_batch_paths.append(tmp_label_batch)
@@ -57,14 +64,14 @@ class ImageDataset:
         image_paths = self.image_batches[idx]
         label_paths = self.label_batches[idx]
         imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
-        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 1))
+        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 2))
         for i in range(self.bsize):
             img = cv.imread(image_paths[i], cv.IMREAD_COLOR)
-            lab = cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE)
+            lab = cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE).reshape(self.img_size[0], self.img_size[1], 1)
+            onehot_lab = to_categorical(lab, num_classes=2)
             imgs[i] = img
-            labs[i] = lab.reshape(self.img_size[0], self.img_size[1], 1)
-        
+            labs[i] = onehot_lab
         tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.uint8)
         tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
-
+        
         return tensor_imgs, tensor_labs
