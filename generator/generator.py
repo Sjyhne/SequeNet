@@ -14,15 +14,7 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
 
     image_dataset = ImageDataset(img_paths, batch_size, (heigth, width))
     
-    image_dataset_generator = lambda: (i for i in image_dataset)
-
-    dataset = tf.data.Dataset.from_generator(
-        image_dataset_generator,
-        (tf.uint8, tf.uint8),
-        (tf.TensorShape([batch_size, heigth, width, 3]), tf.TensorShape([batch_size, heigth, width, 2]))
-    )
-    
-    return image_dataset, len(image_dataset)
+    return image_dataset
 
 if __name__ == "__main__":
 

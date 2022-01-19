@@ -9,7 +9,7 @@ import csv
 from models.metrics import boundary_iou
 
 def remove_all_folders_in_path(path):
-    for folder in os.listdir():
+    for folder in os.listdir(path):
         if os.path.isdir(os.path.join(path, folder)):
             shutil.rmtree(os.path.join(path, folder))
 
@@ -27,21 +27,19 @@ def calc_biou(pred_imgs, anns):
     for i, pi in enumerate(pred_imgs):
         ann = anns[i].numpy().astype("uint8")
         pred_img = pi.numpy().astype("uint8")
-        print(ann.shape, pred_img.shape)
         biou.append(boundary_iou(ann, pred_img))
     
     return np.mean(biou)
 
-def display_and_store_metrics(tlm, vlm, tmm, vmm, tbm, vbm):
+def save_best_model(model, loss_value, best_loss_value, epoch):
+    if loss_value < best_loss_value:
+        save_path = os.path.join("model_output", f"{epoch}_.h5")
+        model.save(save_path)
+        return loss_value
+    else:
+        return best_loss_value
 
-    mtrcs = {
-        "train_loss": [], 
-        "val_loss": [],
-        "train_miou": [],
-        "val_miou": [],
-        "train_biou": [],
-        "val_biou": []
-        }
+def display_and_store_metrics(tlm, vlm, tmm, vmm, tbm, vbm):
 
     train_loss = tlm.result()
     val_loss = vlm.result()
@@ -49,8 +47,6 @@ def display_and_store_metrics(tlm, vlm, tmm, vmm, tbm, vbm):
     val_miou = np.mean(vmm)
     train_biou = np.mean(tbm)
     val_biou = np.mean(vbm)
-
-    mtrcs["train_loss"].append()
 
     print("Train loss: %.4f | Val loss: %.4f" % (float(train_loss), float(val_loss)))
     print("Train miou: %.4f | Val miou: %.4f" % (float(train_miou), float(val_miou)))
@@ -60,7 +56,7 @@ def display_and_store_metrics(tlm, vlm, tmm, vmm, tbm, vbm):
     fpath = "logs/metrics.csv"
 
     losses = [
-        train_loss, val_loss,
+        train_loss.numpy(), val_loss.numpy(),
         train_miou, val_miou,
         train_biou, val_biou]
 
