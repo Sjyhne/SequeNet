@@ -1,16 +1,18 @@
 # train.py
 
 from models import finalize_model, build_model
-from models.metrics import mean_iou, boundary_iou
+from models.metrics import mean_iou
 from generator import create_dataset_generator
+from train_utils import calc_biou, remove_all_folders_in_path, store_images
+from train_utils import display_and_store_metrics
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
+import argparse
 import os
-import shutil
 
 @tf.function
 def train_step(m, x, y, loss_func, optimizer):
@@ -35,16 +37,28 @@ def evaluate_step(m, x, y, loss_func):
 
 if __name__ == "__main__":
     
-    dpath = "data/large_building_area/img_dir/"
+    parser = argparse.ArgumentParser(description="Add custom arguments for the training of the model(s)")
 
-    train_ds, len_train_ds = create_dataset_generator(dpath, "train", batch_size=8)
-    val_ds, len_val_ds = create_dataset_generator(dpath, "val", batch_size=8)
-    test_ds, len_test_ds = create_dataset_generator(dpath, "test", batch_size=8)
+    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs for training")
+    parser.add_argument("--init_lr", type=float, default=1e-4, help="The initial learning rate")
+    parser.add_argument("--image_dim", type=tuple, default=(512, 512), help="The dimensions of the input image")
+    parser.add_argument("--num_channels", type=int, default=3, help="Number of channels in input image")
+    parser.add_argument("--num_classes", type=int, default=2, help="The number of classes to predict")
+    parser.add_argument("--model_type", type=str, default="unet", help="The model type to be trained", choices=["unet", "deeplab"])
+    parser.add_argument("--batch_size", type=int, default=8, help="The batchsize used for the training")
+    parser.add_argument("--data_path", type=str, default="data/large_building_area/img_dir", help="Path to data used for training")
+
+    args = parser.parse_args()
+
+    train_ds, len_train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size)
+    val_ds, len_val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size)
+    test_ds, len_test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size)
     
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
+    # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=args.init_lr)
     loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
 
-    m = finalize_model(build_model(512, 512, 3, 2), optimizer=optimizer)
+    m = finalize_model(build_model(args.image_dim, args.num_channels, args.num_classes), optimizer=optimizer)
 
     # Prepare the metrics.
     train_loss_metric = tf.keras.metrics.CategoricalCrossentropy(from_logits=True)
@@ -54,11 +68,8 @@ if __name__ == "__main__":
     train_biou_metric = []
     val_biou_metric = []
     
-    for folder in os.listdir("output_images/train_ds/"):
-        shutil.rmtree("output_images/train_ds/" + folder)
-    
-    for folder in os.listdir("output_images/val_ds/"):
-        shutil.rmtree("output_images/val_ds/" + folder)
+    remove_all_folders_in_path("output_images/train_ds/")
+    remove_all_folders_in_path("output_images/val_ds/")
 
     epochs = 10
     
@@ -71,23 +82,13 @@ if __name__ == "__main__":
             pred_images = tf.squeeze(tf.math.argmax(tf.nn.softmax(logits, axis=-1), axis=-1))
             iou_anns = tf.squeeze(tf.math.argmax(anns, axis=-1))
             miou = mean_iou(iou_anns, pred_images).numpy()
-            biou = []
-            for i, pi in enumerate(pred_images):
-                biou.append(boundary_iou(iou_anns[i].numpy().astype("uint8"), pi.numpy().astype("uint8")))
-            
-            biou = np.mean(biou)
+            biou = calc_biou(pred_images, iou_anns)
             
             train_loss_metric.update_state(anns, logits)
             train_miou_metric.append(miou)
             train_biou_metric.append(biou)
             if step == len_train_ds - 1:
-                os.mkdir(f"output_images/train_ds/{epoch}")
-                for i, pi in enumerate(pred_images):
-                    f, x = plt.subplots(1, 3)
-                    x[0].imshow(pi.numpy())
-                    x[1].imshow(iou_anns[i].numpy())
-                    x[2].imshow(imgs[i].numpy())
-                    plt.savefig(f"output_images/train_ds/{epoch}/{i}_.png", dpi=200)
+                store_images(pred_images, iou_anns, imgs, f"output_images/train_ds/{epoch}")
                 break
         
         for step, (imgs, anns) in enumerate(val_ds):
@@ -95,37 +96,20 @@ if __name__ == "__main__":
             pred_images = tf.squeeze(tf.math.argmax(tf.nn.softmax(logits, axis=-1), axis=-1))
             iou_anns = tf.squeeze(tf.math.argmax(anns, axis=-1))
             miou = mean_iou(iou_anns, pred_images).numpy()
-            biou = []
-            for i, pi in enumerate(pred_images):
-                biou.append(boundary_iou(iou_anns[i].numpy().astype("uint8"), pi.numpy().astype("uint8")))
-            
-            biou = np.mean(biou)
+            biou = calc_biou(pred_images, anns)
             
             val_loss_metric.update_state(anns, logits)
             val_miou_metric.append(miou)
             val_biou_metric.append(biou)
             if step == len_val_ds - 1:
-                os.mkdir(f"output_images/val_ds/{epoch}")
-                for i, pi in enumerate(pred_images):
-                    f, x = plt.subplots(1, 3)
-                    x[0].imshow(pi.numpy())
-                    x[1].imshow(iou_anns[i].numpy())
-                    x[2].imshow(imgs[i].numpy())
-                    plt.savefig(f"output_images/val_ds/{epoch}/{i}_.png", dpi=200)
+                store_images(pred_images, iou_anns, imgs, f"output_images/val_ds/{epoch}")
                 break
 
-
-        # Display metrics at the end of each epoch.
-        train_loss = train_loss_metric.result()
-        val_loss = val_loss_metric.result()
-        train_miou = sum(train_miou_metric) / len(train_miou_metric)
-        val_miou = sum(val_miou_metric) / len(val_miou_metric)
-        train_biou = sum(train_biou_metric) / len(train_biou_metric)
-        val_biou = sum(val_biou_metric) / len(val_biou_metric)
-        print("Train loss: %.4f | Val loss: %.4f" % (float(train_loss), float(val_loss)))
-        print("Train miou: %.4f | Val miou: %.4f" % (float(train_miou), float(val_miou)))
-        print("Train biou: %.4f | Val biou: %.4f" % (float(train_biou), float(val_biou)))
-        print()
+        display_and_store_metrics(
+            train_loss_metric, val_loss_metric,
+            train_miou_metric, val_miou_metric,
+            train_biou_metric, val_biou_metric
+        )
 
         # Reset training metrics at the end of each epoch
         train_loss_metric.reset_states()

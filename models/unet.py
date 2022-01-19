@@ -140,8 +140,7 @@ class UpconvBlock(layers.Layer):
                     **super(UpconvBlock, self).get_config(),
                     )
 
-def build_model(nx: Optional[int] = None,
-                ny: Optional[int] = None,
+def build_model(img_dim: tuple = (512, 512),
                 channels: int = 1,
                 num_classes: int = 2,
                 layer_depth: int = 5,
@@ -167,7 +166,7 @@ def build_model(nx: Optional[int] = None,
     :return: A TF Keras model
     """
 
-    inputs = Input(shape=(nx, ny, channels), name="inputs")
+    inputs = Input(shape=(img_dim[0], img_dim[1], channels), name="inputs")
 
     x = inputs
     contracting_layers = {}
