@@ -1,12 +1,13 @@
 # train.py
 
-from models import finalize_model, build_model
+from models import finalize_model, build_model, get_model
 from models.metrics import mean_iou
 from generator import create_dataset_generator
 from train_utils import calc_biou, remove_all_folders_in_path, store_images
 from train_utils import display_and_store_metrics, save_best_model
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -14,7 +15,6 @@ from tqdm import tqdm
 import argparse
 import os
 
-@tf.function
 def train_step(m, x, y, loss_func, optimizer):
     with tf.GradientTape() as tape:
         logits = m(x, training=True)
@@ -22,13 +22,13 @@ def train_step(m, x, y, loss_func, optimizer):
 
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
-    grads = tape.gradient(loss_val, m.trainable_weights)
+    grads = tape.gradient(loss_val, m.trainable_variables)
+    
     # Run one step of gradient descent by updating
     # the value of the variables to minimize the loss.
-    optimizer.apply_gradients(zip(grads, m.trainable_weights))
-    return loss_val, logits
+    optimizer.apply_gradients(zip(grads, m.trainable_variables))
+    return loss_val, tf.nn.softmax(logits, axis=-1)
 
-@tf.function
 def evaluate_step(m, x, y, loss_func):
     logits = m(x, training=False)
     loss_val = loss_func(y, logits)
@@ -37,14 +37,14 @@ def evaluate_step(m, x, y, loss_func):
 def train(args, train_ds, val_ds):
     
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
-    optimizer = tf.keras.optimizers.Adam(learning_rate=args.init_lr)
-    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
+    loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-    m = finalize_model(build_model(args.image_dim, args.num_channels, args.num_classes), optimizer=optimizer)
-
+    m = get_model((512, 512), 2)
+    
     # Prepare the metrics.
-    train_loss_metric = tf.keras.metrics.CategoricalCrossentropy(from_logits=True)
-    val_loss_metric = tf.keras.metrics.CategoricalCrossentropy(from_logits=True)
+    train_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy(from_logits=True)
+    val_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy(from_logits=True)
     train_miou_metric = []
     val_miou_metric = []
     train_biou_metric = []
@@ -53,7 +53,7 @@ def train(args, train_ds, val_ds):
     remove_all_folders_in_path("output_images/train_ds/")
     remove_all_folders_in_path("output_images/val_ds/")
 
-    epochs = 10
+    epochs = args.epochs
     
     best_loss_value = 10_000
     
@@ -63,8 +63,9 @@ def train(args, train_ds, val_ds):
         print()
         for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, logits = train_step(m, imgs, anns, loss_fn, optimizer)
-            pred_images = tf.squeeze(tf.math.argmax(tf.nn.softmax(logits, axis=-1), axis=-1))
-            iou_anns = tf.squeeze(tf.math.argmax(anns, axis=-1))
+            print("loss:", loss)
+            pred_images = tf.math.argmax(logits, axis=-1)
+            iou_anns = tf.math.argmax(anns, axis=-1)
             miou = mean_iou(iou_anns, pred_images).numpy()
             biou = calc_biou(pred_images, iou_anns)
             
@@ -76,8 +77,8 @@ def train(args, train_ds, val_ds):
         
         for step, (imgs, anns) in enumerate(val_ds):
             loss, logits = evaluate_step(m, imgs, anns, loss_fn)
-            pred_images = tf.squeeze(tf.math.argmax(tf.nn.softmax(logits, axis=-1), axis=-1))
-            iou_anns = tf.squeeze(tf.math.argmax(anns, axis=-1))
+            pred_images = tf.math.argmax(logits, axis=-1)
+            iou_anns = tf.math.argmax(anns, axis=-1)
             miou = mean_iou(iou_anns, pred_images).numpy()
             biou = calc_biou(pred_images, iou_anns)
             
@@ -93,7 +94,7 @@ def train(args, train_ds, val_ds):
             train_biou_metric, val_biou_metric
         )
         
-        best_loss_value = save_best_model(m, train_loss_metric.result(), best_loss_value, epoch)
+        best_loss_value = save_best_model(m, val_loss_metric.result(), best_loss_value, epoch)
 
         # Reset training metrics at the end of each epoch
         train_loss_metric.reset_states()
@@ -118,9 +119,11 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", type=str, default="data/large_building_area/img_dir", help="Path to data used for training")
 
     args = parser.parse_args()
-
-    train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size)
-    val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size)
-    test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size)
     
-    train(args, val_ds, test_ds)
+    percentage = 0.01
+    
+    train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=percentage)
+    val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=percentage)
+    test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=percentage)
+    
+    train(args, train_ds, val_ds)

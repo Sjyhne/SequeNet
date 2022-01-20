@@ -15,9 +15,6 @@ from tensorflow.keras import losses
 from tensorflow.keras.initializers import TruncatedNormal
 from tensorflow.keras.optimizers import Adam
 
-from models.metrics import mean_iou as mi
-from models.metrics import dice_coefficient as dc
-
 class ConvBlock(layers.Layer):
 
     def __init__(self, layer_idx: int, filters_root: int, kernel_size: int, dropout_rate: float, padding: str, activation: str, **kwargs):
@@ -141,13 +138,13 @@ class UpconvBlock(layers.Layer):
                     )
 
 def build_model(img_dim: tuple = (512, 512),
-                channels: int = 1,
-                num_classes: int = 2,
+                channels: int = 3,
+                num_classes: int = 1,
                 layer_depth: int = 5,
                 filters_root: int = 64,
                 kernel_size: int = 3,
                 pool_size: int = 2,
-                dropout_rate: int = 0.5,
+                dropout_rate: int = 0.2,
                 padding:str="same",
                 activation:Union[str, Callable]="relu") -> Model:
     """
@@ -250,7 +247,6 @@ def _get_kernel_initializer(filters, kernel_size):
 
 def finalize_model(model: Model,
                    loss: Optional[Union[Callable, str]]=losses.categorical_crossentropy,
-                   optimizer: Optional[Union[Callable, str]]=None,
                    metrics:Optional[List[Union[Callable,str]]]=None,
                    dice_coefficient: bool=True,
                    auc: bool=True,
@@ -268,32 +264,9 @@ def finalize_model(model: Model,
     :param opt_kwargs: key word arguments passed to default optimizer (Adam), e.g. learning rate
     """
 
-    if optimizer is None:
-        optimizer = Adam(**opt_kwargs)
-
-    if metrics is None:
-        metrics = ['categorical_crossentropy',
-                   'categorical_accuracy',
-                   ]
-
-    if mean_iou:
-        metrics += [mi]
-
-    if dice_coefficient:
-        metrics += [dc]
-
-    if auc:
-        metrics += [tf.keras.metrics.AUC()]
-
-    model.compile(loss=loss,
-                  optimizer=optimizer,
-                  metrics=metrics,
-                  )
-                
     return model
 
 if __name__ == "__main__":
     m = finalize_model(build_model())
 
     print(m.summary())
-    print(len(m.trainable_weights))

@@ -2,14 +2,16 @@ import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
 import numpy as np
 import cv2 as cv
+import matplotlib.pyplot as plt
 
 import random
 import os
 
 class ImageDataset:
-    def __init__(self, image_paths, bsize, img_size) -> None:
+    def __init__(self, image_paths, bsize, img_size, data_percentage=1.0) -> None:
         self.image_paths = image_paths
         random.shuffle(self.image_paths)
+        self.image_paths = self.image_paths[:int(len(self.image_paths) * data_percentage)]
         self.label_paths = self.get_label_paths()
         self.bsize = bsize
         self.img_size = img_size
@@ -64,14 +66,13 @@ class ImageDataset:
         image_paths = self.image_batches[idx]
         label_paths = self.label_batches[idx]
         imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
-        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 2))
+        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 1))
         for i in range(self.bsize):
             img = cv.imread(image_paths[i], cv.IMREAD_COLOR)
             lab = cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE).reshape(self.img_size[0], self.img_size[1], 1)
-            onehot_lab = to_categorical(lab, num_classes=2)
             imgs[i] = img
-            labs[i] = onehot_lab
-        tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.uint8)
-        tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
+            labs[i] = lab
+        tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.int64)
+        tensor_labs = tf.convert_to_tensor(labs, dtype=tf.int64)
         
         return tensor_imgs, tensor_labs
