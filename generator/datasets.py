@@ -73,6 +73,6 @@ class ImageDataset:
             imgs[i] = img
             labs[i] = lab
         tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.int64)
-        tensor_labs = tf.convert_to_tensor(labs, dtype=tf.int64)
+        tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
         
         return tensor_imgs, tensor_labs

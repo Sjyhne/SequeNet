@@ -20,8 +20,6 @@ NUM_CLASSES = 2
 def train_step(m, x, y, loss_func, optimizer):
     with tf.GradientTape()  as tape:
         logits = m(x, training=True)
-        #sample_weights = calculate_sample_weight(y, NUM_CLASSES)
-        #print("sample_weights:", sample_weights)
         loss_val = loss_func(y, logits)
 
     # Use the gradient tape to automatically retrieve
@@ -43,9 +41,15 @@ def train(args, train_ds, val_ds):
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
     loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-    m = DeeplabV3Plus(512, 2)
     
+    if args.model_type == "unet":
+        m = get_model((512, 512), args.num_classes)
+    elif args.model_type == "deeplab":
+        m = DeeplabV3Plus(512, args.num_classes)
+    else:
+        print("Not a supported model-type")
+        exit()
+        
     # Prepare the metrics.
     train_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy(from_logits=True)
     val_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy(from_logits=True)
@@ -67,8 +71,8 @@ def train(args, train_ds, val_ds):
         print()
         for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, logits = train_step(m, imgs, anns, loss_fn, optimizer)
-            pred_images = tf.math.argmax(logits, axis=-1)
-            iou_anns = tf.math.argmax(anns, axis=-1)
+            pred_images = tf.math.argmax(tf.nn.softmax(logits, axis=-1), axis=-1)
+            iou_anns = tf.squeeze(anns, axis=-1)
             miou = mean_iou(iou_anns, pred_images).numpy()
             biou = calc_biou(pred_images, iou_anns)
             
@@ -80,8 +84,8 @@ def train(args, train_ds, val_ds):
         
         for step, (imgs, anns) in enumerate(val_ds):
             loss, logits = evaluate_step(m, imgs, anns, loss_fn)
-            pred_images = tf.math.argmax(logits, axis=-1)
-            iou_anns = tf.math.argmax(anns, axis=-1)
+            pred_images = tf.math.argmax(tf.nn.softmax(logits, axis=-1), axis=-1)
+            iou_anns = tf.squeeze(anns, axis=-1)
             miou = mean_iou(iou_anns, pred_images).numpy()
             biou = calc_biou(pred_images, iou_anns)
             
@@ -120,10 +124,11 @@ if __name__ == "__main__":
     parser.add_argument("--model_type", type=str, default="unet", help="The model type to be trained", choices=["unet", "deeplab"])
     parser.add_argument("--batch_size", type=int, default=8, help="The batchsize used for the training")
     parser.add_argument("--data_path", type=str, default="data/large_building_area/img_dir", help="Path to data used for training")
+    parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
 
     args = parser.parse_args()
     
-    percentage = 0.01
+    percentage = args.data_percentage
     
     train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=percentage)
     val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=percentage)
