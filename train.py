@@ -128,10 +128,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    percentage = args.data_percentage
-    
-    train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=percentage)
-    val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=percentage)
-    test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=percentage)
+    train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
+    val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
+    test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage)
     
     train(args, train_ds, val_ds)
