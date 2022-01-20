@@ -38,6 +38,20 @@ def save_best_model(model, loss_value, best_loss_value, epoch):
         return loss_value
     else:
         return best_loss_value
+    
+def calculate_sample_weight(labels, num_classes):
+    unique_values = range(num_classes)
+    unique_value_count = []
+    total = 0
+    for val in unique_values:
+        count = tf.math.count_nonzero(tf.math.equal(labels, val)).numpy()
+        total += count
+        unique_value_count.append(count)
+    
+    sample_w = [i / total for i in unique_value_count]
+    
+    return sample_w
+        
 
 def display_and_store_metrics(tlm, vlm, tmm, vmm, tbm, vbm):
 

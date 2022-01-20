@@ -1,10 +1,10 @@
 # train.py
 
-from models import finalize_model, build_model, get_model
+from models import finalize_model, build_model, get_model, DeeplabV3Plus
 from models.metrics import mean_iou
 from generator import create_dataset_generator
 from train_utils import calc_biou, remove_all_folders_in_path, store_images
-from train_utils import display_and_store_metrics, save_best_model
+from train_utils import display_and_store_metrics, save_best_model, calculate_sample_weight
 
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -15,9 +15,13 @@ from tqdm import tqdm
 import argparse
 import os
 
+NUM_CLASSES = 2
+
 def train_step(m, x, y, loss_func, optimizer):
-    with tf.GradientTape() as tape:
+    with tf.GradientTape()  as tape:
         logits = m(x, training=True)
+        #sample_weights = calculate_sample_weight(y, NUM_CLASSES)
+        #print("sample_weights:", sample_weights)
         loss_val = loss_func(y, logits)
 
     # Use the gradient tape to automatically retrieve
@@ -40,7 +44,7 @@ def train(args, train_ds, val_ds):
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
     loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-    m = get_model((512, 512), 2)
+    m = DeeplabV3Plus(512, 2)
     
     # Prepare the metrics.
     train_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy(from_logits=True)
@@ -63,7 +67,6 @@ def train(args, train_ds, val_ds):
         print()
         for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, logits = train_step(m, imgs, anns, loss_fn, optimizer)
-            print("loss:", loss)
             pred_images = tf.math.argmax(logits, axis=-1)
             iou_anns = tf.math.argmax(anns, axis=-1)
             miou = mean_iou(iou_anns, pred_images).numpy()
