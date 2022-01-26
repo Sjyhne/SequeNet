@@ -2,7 +2,7 @@
 
 from models import finalize_model, build_model, get_model, DeeplabV3Plus
 from models.metrics import mean_iou
-from generator import create_dataset_generator
+from generator import create_dataset_generator, create_cityscapes_generator
 from train_utils import calc_biou, remove_all_folders_in_path, store_images
 from train_utils import display_and_store_metrics, save_best_model, calculate_sample_weight
 
@@ -11,6 +11,7 @@ import tensorflow_addons as tfa
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+import tensorflow_datasets as tfds
 
 import argparse
 import os
@@ -127,9 +128,15 @@ if __name__ == "__main__":
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
 
     args = parser.parse_args()
-    
-    train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
-    val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
-    test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage)
-    
+
+
+    if args.dataset == "lba":
+        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
+        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
+        test_ds = create_dataset_generator(args.data_path, "test", batch_sizsde=args.batch_size, data_percentage=args.data_percentage)
+    elif args.dataset == "cityscapes":
+        train_ds = create_cityscapes_generator("train")
+        val_ds = create_cityscapes_generator("val")
+        test_ds = create_cityscapes_generator("test")
+
     train(args, train_ds, val_ds)
