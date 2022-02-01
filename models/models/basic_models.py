@@ -19,26 +19,26 @@ def vanilla_encoder(input_height=224,  input_width=224, channels=3):
     x = img_input
     levels = []
 
-    x = (ZeroPadding2D((pad, pad), data_format=IMAGE_ORDERING))(x)
+    #x = (ZeroPadding2D((pad, pad), data_format=IMAGE_ORDERING))(x)
     x = (Conv2D(filter_size, (kernel, kernel),
-                data_format=IMAGE_ORDERING, padding='valid'))(x)
+                data_format=IMAGE_ORDERING, padding='same'))(x)
     x = (BatchNormalization())(x)
     x = (Activation('relu'))(x)
     x = (MaxPooling2D((pool_size, pool_size), data_format=IMAGE_ORDERING))(x)
     levels.append(x)
 
-    x = (ZeroPadding2D((pad, pad), data_format=IMAGE_ORDERING))(x)
+    #x = (ZeroPadding2D((pad, pad), data_format=IMAGE_ORDERING))(x)
     x = (Conv2D(128, (kernel, kernel), data_format=IMAGE_ORDERING,
-         padding='valid'))(x)
+         padding='same'))(x)
     x = (BatchNormalization())(x)
     x = (Activation('relu'))(x)
     x = (MaxPooling2D((pool_size, pool_size), data_format=IMAGE_ORDERING))(x)
     levels.append(x)
 
     for _ in range(3):
-        x = (ZeroPadding2D((pad, pad), data_format=IMAGE_ORDERING))(x)
+        #x = (ZeroPadding2D((pad, pad), data_format=IMAGE_ORDERING))(x)
         x = (Conv2D(256, (kernel, kernel),
-                    data_format=IMAGE_ORDERING, padding='valid'))(x)
+                    data_format=IMAGE_ORDERING, padding='same'))(x)
         x = (BatchNormalization())(x)
         x = (Activation('relu'))(x)
         x = (MaxPooling2D((pool_size, pool_size),

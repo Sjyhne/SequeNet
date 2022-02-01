@@ -2,7 +2,7 @@ import tensorflow_datasets as tfds
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from datasets import ImageDataset
+from .datasets import ImageDataset
 
 import os
 

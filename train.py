@@ -1,17 +1,15 @@
 # train.py
 
-from models import finalize_model, build_model, get_model, DeeplabV3Plus
+from pyexpat import model
 from models.metrics import mean_iou
 from generator import create_dataset_generator, create_cityscapes_generator
 from train_utils import calc_biou, remove_all_folders_in_path, store_images
 from train_utils import display_and_store_metrics, save_best_model, calculate_sample_weight
 
+from models.models.all_models import model_from_name
+
 import tensorflow as tf
-import tensorflow_addons as tfa
-import matplotlib.pyplot as plt
-import numpy as np
 from tqdm import tqdm
-import tensorflow_datasets as tfds
 
 import argparse
 import os
@@ -21,6 +19,9 @@ NUM_CLASSES = 2
 def train_step(m, x, y, loss_func, optimizer):
     with tf.GradientTape()  as tape:
         logits = m(x, training=True)
+        print(x.shape)
+        print(logits.shape)
+        print(y.shape)
         loss_val = loss_func(y, logits)
 
     # Use the gradient tape to automatically retrieve
@@ -43,13 +44,17 @@ def train(args, train_ds, val_ds):
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
     loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     
-    if args.model_type == "unet":
-        m = get_model((512, 512), args.num_classes)
-    elif args.model_type == "deeplab":
-        m = DeeplabV3Plus(512, args.num_classes)
-    else:
-        print("Not a supported model-type")
-        exit()
+    m = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
+
+    print(m)
+    
+    #if args.model_type == "unet":
+    #    m = get_model(tuple(args.image_dim), args.num_classes)
+    #elif args.model_type == "deeplab":
+    #    m = DeeplabV3Plus(args.image_dim[0], args.num_classes)
+    #else:
+    #    print("Not a supported model-type")
+    #    exit()
         
     # Prepare the metrics.
     train_loss_metric = tf.keras.metrics.SparseCategoricalCrossentropy(from_logits=True)
@@ -119,21 +124,21 @@ if __name__ == "__main__":
 
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs for training")
     parser.add_argument("--init_lr", type=float, default=1e-3, help="The initial learning rate")
-    parser.add_argument("--image_dim", type=tuple, default=(512, 512), help="The dimensions of the input image")
+    parser.add_argument("--image_dim", type=int, default=512, help="The dimensions of the input image")
     parser.add_argument("--num_channels", type=int, default=3, help="Number of channels in input image")
     parser.add_argument("--num_classes", type=int, default=2, help="The number of classes to predict")
-    parser.add_argument("--model_type", type=str, default="unet", help="The model type to be trained", choices=["unet", "deeplab"])
+    parser.add_argument("--model_type", type=str, default="unet", help="The model type to be trained", choices=list(model_from_name.keys()))
     parser.add_argument("--batch_size", type=int, default=8, help="The batchsize used for the training")
     parser.add_argument("--data_path", type=str, default="data/large_building_area/img_dir", help="Path to data used for training")
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
+    parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
 
     args = parser.parse_args()
-
 
     if args.dataset == "lba":
         train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
         val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
-        test_ds = create_dataset_generator(args.data_path, "test", batch_sizsde=args.batch_size, data_percentage=args.data_percentage)
+        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage)
     elif args.dataset == "cityscapes":
         train_ds = create_cityscapes_generator("train")
         val_ds = create_cityscapes_generator("val")

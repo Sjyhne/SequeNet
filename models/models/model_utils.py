@@ -86,9 +86,9 @@ def get_segmentation_model(input, output):
         input_height = i_shape[1]
         input_width = i_shape[2]
         n_classes = o_shape[3]
-        o = (Reshape((output_height*output_width, -1)))(o)
+        #o = (Reshape((output_height*output_width, -1)))(o)
 
-    o = (Activation('softmax'))(o)
+    #o = (Activation('softmax'))(o)
     model = Model(img_input, o)
     model.output_width = output_width
     model.output_height = output_height
@@ -97,9 +97,11 @@ def get_segmentation_model(input, output):
     model.input_width = input_width
     model.model_name = ""
 
-    model.train = MethodType(train, model)
-    model.predict_segmentation = MethodType(predict, model)
-    model.predict_multiple = MethodType(predict_multiple, model)
-    model.evaluate_segmentation = MethodType(evaluate, model)
+    print(output_height, output_width)
+
+    #¤model.train = MethodType(train, model)
+    #¤model.predict_segmentation = MethodType(predict, model)
+    #¤model.predict_multiple = MethodType(predict_multiple, model)
+    #¤model.evaluate_segmentation = MethodType(evaluate, model)
 
     return model

@@ -100,6 +100,9 @@ def _unet(n_classes, encoder, l1_skip_conn=True, input_height=416,
     o = (Conv2D(64, (3, 3), padding='valid', activation='relu', data_format=IMAGE_ORDERING, name="seg_feats"))(o)
     o = (BatchNormalization())(o)
 
+    o = (UpSampling2D((2, 2), data_format=IMAGE_ORDERING))(o)
+
+    # Added to make images the correct size
     o = Conv2D(n_classes, (3, 3), padding='same',
                data_format=IMAGE_ORDERING)(o)
 

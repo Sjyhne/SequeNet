@@ -1,5 +1,7 @@
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Cropping2D, Conv2D, Add, Dropout, Conv2DTranspose
+from tensorflow.keras.layers import Cropping2D, Conv2D, Add, Dropout, Conv2DTranspose, Resizing
+
+import tensorflow as tf
 
 from .config import IMAGE_ORDERING
 from .model_utils import get_segmentation_model
@@ -57,7 +59,7 @@ def fcn_8(n_classes, encoder=vanilla_encoder, input_height=416,
 
     o = f5
 
-    o = (Conv2D(4096, (7, 7), activation='relu',
+    o = (Conv2D(4096, (8, 8), activation='relu',
                 padding='same', data_format=IMAGE_ORDERING))(o)
     o = Dropout(0.5)(o)
     o = (Conv2D(4096, (1, 1), activation='relu',
@@ -66,18 +68,18 @@ def fcn_8(n_classes, encoder=vanilla_encoder, input_height=416,
 
     o = (Conv2D(n_classes,  (1, 1), kernel_initializer='he_normal',
                 data_format=IMAGE_ORDERING))(o)
-    o = Conv2DTranspose(n_classes, kernel_size=(4, 4),  strides=(
+    o = Conv2DTranspose(n_classes, kernel_size=(2, 2),  strides=(
         2, 2), use_bias=False, data_format=IMAGE_ORDERING)(o)
 
     o2 = f4
-    o2 = (Conv2D(n_classes,  (1, 1), kernel_initializer='he_normal',
+    o2 = (Conv2D(n_classes,  (2, 2), kernel_initializer='he_normal',
                  data_format=IMAGE_ORDERING))(o2)
 
     o, o2 = crop(o, o2, img_input)
 
     o = Add()([o, o2])
 
-    o = Conv2DTranspose(n_classes, kernel_size=(4, 4),  strides=(
+    o = Conv2DTranspose(n_classes, kernel_size=(3, 3),  strides=(
         2, 2), use_bias=False, data_format=IMAGE_ORDERING)(o)
     o2 = f3
     o2 = (Conv2D(n_classes,  (1, 1), kernel_initializer='he_normal',
@@ -109,13 +111,14 @@ def fcn_32(n_classes, encoder=vanilla_encoder, input_height=416,
                 padding='same', data_format=IMAGE_ORDERING))(o)
     o = Dropout(0.5)(o)
 
-    o = (Conv2D(n_classes,  (1, 1), kernel_initializer='he_normal',
+    o = (Conv2D(n_classes,  (2, 2), kernel_initializer='he_normal',
                 data_format=IMAGE_ORDERING , name="seg_feats" ))(o)
     o = Conv2DTranspose(n_classes, kernel_size=(64, 64),  strides=(
         32, 32), use_bias=False,  data_format=IMAGE_ORDERING)(o)
 
     model = get_segmentation_model(img_input, o)
     model.model_name = "fcn_32"
+    print(model.summary())
     return model
 
 

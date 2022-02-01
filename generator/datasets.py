@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.utils import to_categorical
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt

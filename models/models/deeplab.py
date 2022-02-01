@@ -46,8 +46,8 @@ def DilatedSpatialPyramidPooling(dspp_input):
 
 
 
-def DeeplabV3Plus(image_size, num_classes):
-    model_input = keras.Input(shape=(image_size, image_size, 3))
+def deeplab(num_classes,  input_height=512, input_width=512, channels=3):
+    model_input = keras.Input(shape=(input_height, input_width, channels))
     resnet50 = keras.applications.ResNet50(
         weights="imagenet", include_top=False, input_tensor=model_input
     )
@@ -55,7 +55,7 @@ def DeeplabV3Plus(image_size, num_classes):
     x = DilatedSpatialPyramidPooling(x)
 
     input_a = layers.UpSampling2D(
-        size=(image_size // 4 // x.shape[1], image_size // 4 // x.shape[2]),
+        size=(input_height // 4 // x.shape[1], input_width // 4 // x.shape[2]),
         interpolation="bilinear",
     )(x)
     input_b = resnet50.get_layer("conv2_block3_2_relu").output
@@ -65,13 +65,13 @@ def DeeplabV3Plus(image_size, num_classes):
     x = convolution_block(x)
     x = convolution_block(x)
     x = layers.UpSampling2D(
-        size=(image_size // x.shape[1], image_size // x.shape[2]),
+        size=(input_height // x.shape[1], input_width // x.shape[2]),
         interpolation="bilinear",
     )(x)
     model_output = layers.Conv2D(num_classes, kernel_size=(1, 1), padding="same")(x)
+
     return keras.Model(inputs=model_input, outputs=model_output)
 
 
 if __name__ == "__main__":
-    model = DeeplabV3Plus(image_size=512, num_classes=2)
-    model.summary()
+    ...

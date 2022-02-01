@@ -13,26 +13,28 @@ def segnet_decoder(f, n_classes, n_up=3):
     assert n_up >= 2
 
     o = f
-    o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
-    o = (Conv2D(512, (3, 3), padding='valid', data_format=IMAGE_ORDERING))(o)
+    #o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
+    o = (Conv2D(512, (3, 3), padding='same', data_format=IMAGE_ORDERING))(o)
     o = (BatchNormalization())(o)
 
     o = (UpSampling2D((2, 2), data_format=IMAGE_ORDERING))(o)
-    o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
-    o = (Conv2D(256, (3, 3), padding='valid', data_format=IMAGE_ORDERING))(o)
+    #o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
+    o = (Conv2D(256, (3, 3), padding='same', data_format=IMAGE_ORDERING))(o)
     o = (BatchNormalization())(o)
 
     for _ in range(n_up-2):
         o = (UpSampling2D((2, 2), data_format=IMAGE_ORDERING))(o)
-        o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
-        o = (Conv2D(128, (3, 3), padding='valid',
+        #o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
+        o = (Conv2D(128, (3, 3), padding='same',
              data_format=IMAGE_ORDERING))(o)
         o = (BatchNormalization())(o)
 
     o = (UpSampling2D((2, 2), data_format=IMAGE_ORDERING))(o)
-    o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
-    o = (Conv2D(64, (3, 3), padding='valid', data_format=IMAGE_ORDERING, name="seg_feats"))(o)
+    #o = (ZeroPadding2D((1, 1), data_format=IMAGE_ORDERING))(o)
+    o = (Conv2D(64, (3, 3), padding='same', data_format=IMAGE_ORDERING, name="seg_feats"))(o)
     o = (BatchNormalization())(o)
+
+    o = (UpSampling2D((2, 2), data_format=IMAGE_ORDERING))(o)
 
     o = Conv2D(n_classes, (3, 3), padding='same',
                data_format=IMAGE_ORDERING)(o)
@@ -58,6 +60,7 @@ def segnet(n_classes, input_height=416, input_width=608, encoder_level=3, channe
     model = _segnet(n_classes, vanilla_encoder,  input_height=input_height,
                     input_width=input_width, encoder_level=encoder_level, channels=channels)
     model.model_name = "segnet"
+    print(model.summary())
     return model
 
 
