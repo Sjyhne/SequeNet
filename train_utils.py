@@ -51,7 +51,6 @@ def calculate_sample_weight(labels, num_classes):
             b_total += count
             b_count.append(count)
         sample_weights.append(b_count[1] / b_total)
-    print(sample_weights)
     return sample_weights
         
 

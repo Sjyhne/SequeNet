@@ -30,7 +30,7 @@ def model_from_checkpoint_path(checkpoints_path):
     model = model_from_name[model_config['model_class']](
         model_config['n_classes'], input_height=model_config['input_height'],
         input_width=model_config['input_width'])
-    print("loaded weights ", latest_weights)
+    #print("loaded weights ", latest_weights)
     status = model.load_weights(latest_weights)
 
     if status is not None:

@@ -60,7 +60,6 @@ def segnet(n_classes, input_height=416, input_width=608, encoder_level=3, channe
     model = _segnet(n_classes, vanilla_encoder,  input_height=input_height,
                     input_width=input_width, encoder_level=encoder_level, channels=channels)
     model.model_name = "segnet"
-    print(model.summary())
     return model
 
 

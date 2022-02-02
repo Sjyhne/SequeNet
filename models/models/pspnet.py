@@ -71,7 +71,6 @@ def _pspnet(n_classes, encoder,  input_height=384, input_width=576, channels=3):
     o = resize_image(o, (8, 8), data_format=IMAGE_ORDERING)
 
     model = get_segmentation_model(img_input, o)
-    print(model.summary())
     return model
 
 

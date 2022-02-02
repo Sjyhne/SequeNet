@@ -118,7 +118,6 @@ def fcn_32(n_classes, encoder=vanilla_encoder, input_height=416,
 
     model = get_segmentation_model(img_input, o)
     model.model_name = "fcn_32"
-    print(model.summary())
     return model
 
 

@@ -11,7 +11,7 @@ from ..predict import predict, predict_multiple, evaluate
 
 
 # source m1 , dest m2
-def transfer_weights(m1, m2, verbose=True):
+def transfer_weights(m1, m2, verbose=False):
 
     assert len(m1.layers) == len(
         m2.layers), "Both models should have same number of layers"
@@ -36,8 +36,9 @@ def transfer_weights(m1, m2, verbose=True):
             nNotSet += 1
 
     if verbose:
-        print("Copied weights of %d layers and skipped %d layers" %
-              (nSet, nNotSet))
+        #print("Copied weights of %d layers and skipped %d layers" %
+        #      (nSet, nNotSet))
+        pass
 
 
 def resize_image(inp,  s, data_format):
@@ -97,7 +98,7 @@ def get_segmentation_model(input, output):
     model.input_width = input_width
     model.model_name = ""
 
-    print(output_height, output_width)
+    #print(output_height, output_width)
 
     #¤model.train = MethodType(train, model)
     #¤model.predict_segmentation = MethodType(predict, model)
