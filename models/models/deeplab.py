@@ -48,9 +48,14 @@ def DilatedSpatialPyramidPooling(dspp_input):
 
 def deeplab(num_classes,  input_height=512, input_width=512, channels=3):
     model_input = keras.Input(shape=(input_height, input_width, channels))
-    resnet50 = keras.applications.ResNet50(
-        weights="imagenet", include_top=False, input_tensor=model_input
-    )
+    if channels == 3:
+        resnet50 = keras.applications.ResNet50(
+            weights="imagenet", include_top=False, input_tensor=model_input
+        )
+    else:
+        resnet50 = keras.applications.ResNet50(
+            weights=None, include_top=False, input_tensor=model_input
+        )
     x = resnet50.get_layer("conv4_block6_2_relu").output
     x = DilatedSpatialPyramidPooling(x)
 

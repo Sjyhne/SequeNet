@@ -1,5 +1,5 @@
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Cropping2D, Conv2D, Add, Dropout, Conv2DTranspose, Resizing
+from tensorflow.keras.layers import Cropping2D, Conv2D, Add, Dropout, Conv2DTranspose
 
 import tensorflow as tf
 

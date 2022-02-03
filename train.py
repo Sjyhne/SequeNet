@@ -21,8 +21,7 @@ def train_step(m, x, y, loss_func, optimizer):
     with tf.GradientTape()  as tape:
         logits = m(x, training=True)
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-        loss_val = loss_func(y, softmaxed_logits)
-        print("loss_val:", loss_val)
+        loss_val = loss_func(y, logits)
 
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
@@ -33,15 +32,12 @@ def train_step(m, x, y, loss_func, optimizer):
     optimizer.apply_gradients(zip(grads, m.trainable_variables))
     return loss_val, softmaxed_logits, logits
 
-def compute_metrics(softmaxed_logits, anns, imgs, step, epoch, model_type):
+def compute_metrics(softmaxed_logits, anns):
     pred_images = tf.math.argmax(softmaxed_logits, axis=-1)
     iou_anns = tf.squeeze(anns, axis=-1)
     miou = mean_iou(iou_anns, pred_images).numpy()
     biou = calc_biou(pred_images, iou_anns)
     
-    if step == len(train_ds) - 1:
-        store_images(pred_images, iou_anns, imgs, f"output_images/train_ds/{model_type}/{epoch}")
-
     return miou, biou
 
 def evaluate_step(m, x, y, loss_func):
@@ -57,10 +53,10 @@ def train(args, train_ds, val_ds):
     main_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
     
-    if args.extra_model:
+    if args.extra_model == True:
         extra_optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
         extra_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-        extra_model = model_from_name[args.extra_model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim, channels=args.num_classes)
+        extra_model = model_from_name[args.extra_model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim, channels=args.num_channels)
         
     # Prepare the metrics.
     train_loss_metric = []
@@ -76,9 +72,11 @@ def train(args, train_ds, val_ds):
     extra_val_miou_metric = []
     extra_train_biou_metric = []
     extra_val_biou_metric = []
-
-    remove_all_folders_in_path("output_images/train_ds/")
-    remove_all_folders_in_path("output_images/val_ds/")
+    
+    if os.path.exists("output_images/train/"):
+        remove_all_folders_in_path("output_images/train/")
+    if os.path.exists("output_images/val/"):
+        remove_all_folders_in_path("output_images/val/")
 
     epochs = args.epochs
     
@@ -91,41 +89,65 @@ def train(args, train_ds, val_ds):
         print()
         for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer)
-            if args.extra_model:
+            if args.extra_model == True:
+                logits = tf.stop_gradient(softmaxed_logits)
+                logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(logits[:, :, :, 1], 0.2, 0.9), axis=-1))/255
                 extra_loss, extra_softmaxed_logits, extra_logits = train_step(extra_model, logits, anns, extra_loss_fn, extra_optimizer)
-                miou, biou = compute_metrics(extra_softmaxed_logits, anns, imgs, step, epoch, "extra")
+                miou, biou = compute_metrics(extra_softmaxed_logits, anns)
                 extra_train_loss_metric.append(extra_loss)
                 extra_train_miou_metric.append(miou)
                 extra_train_biou_metric.append(biou)
+                if step == len(train_ds) - 1:
+                    store_images(f"output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
-            miou, biou = compute_metrics(softmaxed_logits, anns, imgs, step, epoch, "main")
+            miou, biou = compute_metrics(softmaxed_logits, anns)
             train_loss_metric.append(loss)
             train_miou_metric.append(miou)
             train_biou_metric.append(biou)
+            if args.extra_model == False:
+                if step == len(train_ds) - 1:
+                    store_images(f"output_images/train/{epoch}", anns, imgs, softmaxed_logits)
 
         
         for step, (imgs, anns) in enumerate(val_ds):
             loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn)
-            if args.extra_model:
+            if args.extra_model == True:
+                logits = tf.stop_gradient(softmaxed_logits)
+                logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(logits[:, :, :, 1], 0.2, 0.9), axis=-1))/255
                 extra_loss, extra_softmaxed_logits, extra_logits = train_step(extra_model, logits, anns, extra_loss_fn, extra_optimizer)
-                miou, biou = compute_metrics(extra_softmaxed_logits, anns, imgs, step, epoch)
+                miou, biou = compute_metrics(extra_softmaxed_logits, anns)
                 extra_val_loss_metric.append(extra_loss)
                 extra_val_miou_metric.append(miou)
                 extra_val_biou_metric.append(biou)
+                if step == len(val_ds) - 1:
+                    store_images(f"output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
-            miou, biou = compute_metrics(softmaxed_logits, anns, imgs, step, epoch)
+            miou, biou = compute_metrics(softmaxed_logits, anns)
             val_loss_metric.append(loss)
             val_miou_metric.append(miou)
             val_biou_metric.append(biou)
+            if args.extra_model == False:
+                if step == len(val_ds) - 1:
+                    store_images(f"output_images/val/{epoch}", anns, imgs, softmaxed_logits)
 
         display_and_store_metrics(
             train_loss_metric, val_loss_metric,
             train_miou_metric, val_miou_metric,
-            train_biou_metric, val_biou_metric
+            train_biou_metric, val_biou_metric,
+            "main"
         )
         
-        best_loss_value = save_best_model(main_model, np.mean(val_loss_metric), best_loss_value, epoch)
-        extra_best_loss_value = save_best_model(extra_model, np.mean(extra_val_loss_metric), extra_best_loss_value, epoch)
+        if args.extra_model == True:
+            display_and_store_metrics(
+                extra_train_loss_metric, extra_val_loss_metric,
+                extra_train_miou_metric, extra_val_miou_metric,
+                extra_train_biou_metric, extra_val_biou_metric,
+                "extra"
+            )
+        
+        best_loss_value = save_best_model(main_model, round((sum(val_loss_metric)/len(val_loss_metric)).cpu().numpy(), 3), best_loss_value, epoch)
+        if args.extra_model == True:
+            extra_best_loss_value = save_best_model(extra_model, round((sum(extra_val_loss_metric)/len(extra_val_loss_metric)).cpu().numpy(), 3), extra_best_loss_value, epoch)
 
         # Reset training metrics at the end of each epoch
         train_loss_metric = []
