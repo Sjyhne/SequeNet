@@ -8,6 +8,8 @@ from train_utils import display_and_store_metrics, save_best_model, calculate_sa
 
 from models.models.all_models import model_from_name
 
+from train_utils import get_loss_func
+
 import tensorflow as tf
 from tqdm import tqdm
 import numpy as np
@@ -50,12 +52,12 @@ def train(args, train_ds, val_ds):
     
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
     main_optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
-    main_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    main_loss_fn = get_loss_func(args.main_loss, args.main_label_smooth)
     main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
     
     if args.extra_model == True:
         extra_optimizer = tf.keras.optimizers.SGD(learning_rate=args.init_lr)
-        extra_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+        extra_loss_fn = get_loss_func(args.extra_loss, args.extra_label_smooth)
         extra_model = model_from_name[args.extra_model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim, channels=args.num_channels)
         
     # Prepare the metrics.
@@ -181,6 +183,10 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
     parser.add_argument("--extra_model", type=bool, default=False, help="Whether to use the extra neural network model")
     parser.add_argument("--extra_model_type", type=str, default="fcn_8", help="What type of model the extra neural network should be")
+    parser.add_argument("--main_loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
+    parser.add_argument("--extra_loss", type=str, default="cce", help="The loss function to be used for the extra segmentation network")
+    parser.add_argument("--main_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
+    parser.add_argument("--extra_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the extra network")
 
     args = parser.parse_args()
 

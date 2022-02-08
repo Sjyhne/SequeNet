@@ -1,3 +1,4 @@
+from cProfile import label
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -8,6 +9,8 @@ import os
 import shutil
 import csv
 
+from models.losses import ABL
+
 from models.metrics import boundary_iou
 
 params = {'legend.fontsize': 'xx-small',
@@ -17,6 +20,13 @@ params = {'legend.fontsize': 'xx-small',
          'ytick.labelsize':'xx-small'}
 pylab.rcParams.update(params)
 
+def get_loss_func(loss, label_smoothing=0.0):
+    if loss == "abl":
+        return ABL(label_smoothing=label_smoothing)
+    elif loss == "cce":
+        return tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=label_smoothing)
+    else:
+        raise RuntimeError("Did not provide an implemented loss function")
 
 def remove_all_folders_in_path(path):
     for folder in os.listdir(path):
