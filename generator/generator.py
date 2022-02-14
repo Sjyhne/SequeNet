@@ -2,7 +2,7 @@ import tensorflow_datasets as tfds
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from .datasets import ImageDataset
+from .dataset import ImageDataset
 
 import os
 
@@ -27,7 +27,7 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
 
     data_dir = os.path.join(datapath, datatype)
 
-    img_paths = [os.path.join(data_dir, file) for file in os.listdir(data_dir)]
+    img_paths = [os.path.join(data_dir, file) for file in os.listdir(data_dir) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
 
     image_dataset = ImageDataset(img_paths, batch_size, (heigth, width), data_percentage)
     
@@ -57,15 +57,8 @@ def create_cityscapes_generator(datatype):
 
 if __name__ == "__main__":
 
-    ds = create_cityscapes_generator("train")
+    ds = create_dataset_generator("data/large_building_area/img_dir", "val")
 
-    t = next(iter(ds))
-
-    print(t[0].shape)
-    print(t[1].shape)
+    for img, ann in ds:
+        print(ann.shape)
     
-    for i in range(len(t[0])):
-        f, x = plt.subplots(1, 2)
-        x[0].imshow(t[0][i])
-        x[1].imshow(t[1][i])
-        plt.show()

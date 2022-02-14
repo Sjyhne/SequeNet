@@ -145,13 +145,13 @@ class ABL(tf.keras.losses.Loss):
 
         #logits_d = tf.pad(logits,[[0,0],[1,1],[1,1],[0,0]],mode='CONSTANT') # N(H+2)(W+2)C
         logits_d = logits
-        logits_d = tf.concat([logits_d, tf.expand_dims(logits_d[:,1,:,:], axis=0)], axis=1) # N(H+2)(W+2)C
-        logits_d = tf.concat([tf.expand_dims(logits_d[:,-1,:,:], axis=0), logits_d], axis=1) # N(H+2)(W+2)C
+        logits_d = tf.concat([logits_d, tf.expand_dims(logits_d[:,1,:,:], axis=1)], axis=1) # N(H+2)(W+2)C
+        logits_d = tf.concat([tf.expand_dims(logits_d[:,-1,:,:], axis=1), logits_d], axis=1) # N(H+2)(W+2)C
         
         logits_d = tf.transpose(logits_d, perm=[0, 2, 1, 3])
         
-        logits_d = tf.concat([logits_d, tf.expand_dims(logits_d[:,1,:,:], axis=0)], axis=1) # N(H+2)(W+2)C
-        logits_d = tf.concat([tf.expand_dims(logits_d[:,-1,:,:], axis=0), logits_d], axis=1) # N(H+2)(W+2)C
+        logits_d = tf.concat([logits_d, tf.expand_dims(logits_d[:,1,:,:], axis=1)], axis=1) # N(H+2)(W+2)C
+        logits_d = tf.concat([tf.expand_dims(logits_d[:,-1,:,:], axis=1), logits_d], axis=1) # N(H+2)(W+2)C
         
         logits_d = tf.transpose(logits_d, perm=[0, 2, 1, 3])
         
@@ -222,7 +222,7 @@ class ABL(tf.keras.losses.Loss):
         #        h, w), mode='bilinear', align_corners=True)
 
         logits = tf.transpose(logits, perm=[0, 3, 1, 2])
-
+        
         if len(target.shape) == 4:
             target = tf.squeeze(target, axis=-1)
 

@@ -25,6 +25,8 @@ def get_loss_func(loss, label_smoothing=0.0):
         return ABL(label_smoothing=label_smoothing)
     elif loss == "cce":
         return tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=label_smoothing)
+    elif loss == "scce":
+        return tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     else:
         raise RuntimeError("Did not provide an implemented loss function")
 
@@ -47,9 +49,13 @@ def store_images(path, anns, imgs, pred_images, extra_pred_images=None):
             fig.add_subplot(gs[1, 1])
         
             fig.axes[0].imshow(imgs[i])
-            fig.axes[1].imshow(anns[i])
-            fig.axes[2].imshow(highlighted_images[i])
+            fig.axes[0].set_title("RGB")
+            fig.axes[1].imshow(highlighted_images[i])
+            fig.axes[1].set_title("Mask * RGB")
+            fig.axes[2].imshow(anns[i])
+            fig.axes[2].set_title("Ground Truth")
             fig.axes[3].imshow(pi)
+            fig.axes[3].set_title("Mask")
             
             plt.savefig(os.path.join(path, f"{i}_.png"), dpi=200)
     else:    

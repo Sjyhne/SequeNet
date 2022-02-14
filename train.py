@@ -82,6 +82,8 @@ def train(args, train_ds, val_ds):
 
     epochs = args.epochs
     
+    main_model_pretraining = 20
+    
     best_loss_value = 10_000
     extra_best_loss_value = 10_000
     
@@ -91,7 +93,8 @@ def train(args, train_ds, val_ds):
         print()
         for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer)
-            if args.extra_model == True:
+            miou, biou = compute_metrics(softmaxed_logits, anns)
+            if args.extra_model == True and epoch >= main_model_pretraining:
                 logits = tf.stop_gradient(softmaxed_logits)
                 logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(logits[:, :, :, 1], 0.2, 0.9), axis=-1))/255
                 extra_loss, extra_softmaxed_logits, extra_logits = train_step(extra_model, logits, anns, extra_loss_fn, extra_optimizer)
@@ -102,18 +105,18 @@ def train(args, train_ds, val_ds):
                 if step == len(train_ds) - 1:
                     store_images(f"output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
-            miou, biou = compute_metrics(softmaxed_logits, anns)
             train_loss_metric.append(loss)
             train_miou_metric.append(miou)
             train_biou_metric.append(biou)
-            if args.extra_model == False:
+            if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(train_ds) - 1:
                     store_images(f"output_images/train/{epoch}", anns, imgs, softmaxed_logits)
 
         
         for step, (imgs, anns) in enumerate(val_ds):
             loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn)
-            if args.extra_model == True:
+            miou, biou = compute_metrics(softmaxed_logits, anns)
+            if args.extra_model == True and epoch >= main_model_pretraining:
                 logits = tf.stop_gradient(softmaxed_logits)
                 logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(logits[:, :, :, 1], 0.2, 0.9), axis=-1))/255
                 extra_loss, extra_softmaxed_logits, extra_logits = train_step(extra_model, logits, anns, extra_loss_fn, extra_optimizer)
@@ -124,11 +127,10 @@ def train(args, train_ds, val_ds):
                 if step == len(val_ds) - 1:
                     store_images(f"output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
-            miou, biou = compute_metrics(softmaxed_logits, anns)
             val_loss_metric.append(loss)
             val_miou_metric.append(miou)
             val_biou_metric.append(biou)
-            if args.extra_model == False:
+            if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(val_ds) - 1:
                     store_images(f"output_images/val/{epoch}", anns, imgs, softmaxed_logits)
 
@@ -139,7 +141,7 @@ def train(args, train_ds, val_ds):
             "main"
         )
         
-        if args.extra_model == True:
+        if args.extra_model == True and epoch >= main_model_pretraining:
             display_and_store_metrics(
                 extra_train_loss_metric, extra_val_loss_metric,
                 extra_train_miou_metric, extra_val_miou_metric,
@@ -148,7 +150,7 @@ def train(args, train_ds, val_ds):
             )
         
         best_loss_value = save_best_model(main_model, round((sum(val_loss_metric)/len(val_loss_metric)).cpu().numpy(), 3), best_loss_value, epoch)
-        if args.extra_model == True:
+        if args.extra_model == True and epoch >= main_model_pretraining:
             extra_best_loss_value = save_best_model(extra_model, round((sum(extra_val_loss_metric)/len(extra_val_loss_metric)).cpu().numpy(), 3), extra_best_loss_value, epoch)
 
         # Reset training metrics at the end of each epoch
