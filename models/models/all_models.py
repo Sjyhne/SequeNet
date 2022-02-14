@@ -16,7 +16,7 @@ model_from_name["fcn_32_resnet50"] = fcn.fcn_32_resnet50
 model_from_name["fcn_8_mobilenet"] = fcn.fcn_8_mobilenet
 model_from_name["fcn_32_mobilenet"] = fcn.fcn_32_mobilenet
 
-model_from_name["deeplab"] = deeplab.deeplab
+model_from_name["deeplab"] = deeplab.DeeplabV3Plus
 
 model_from_name["pspnet"] = pspnet.pspnet
 model_from_name["vgg_pspnet"] = pspnet.vgg_pspnet

@@ -36,7 +36,7 @@ def train_step(m, x, y, loss_func, optimizer):
 
 def compute_metrics(softmaxed_logits, anns):
     pred_images = tf.math.argmax(softmaxed_logits, axis=-1)
-    iou_anns = tf.squeeze(anns, axis=-1)
+    iou_anns = tf.math.argmax(anns, axis=-1)
     miou = mean_iou(iou_anns, pred_images).numpy()
     biou = calc_biou(pred_images, iou_anns)
     

@@ -40,7 +40,8 @@ https://github.com/divamgupta/image-segmentation-keras
     * resnet50_unet
     * mobilenet_unet
 * deeplab
+* hrnet
 
 ### Not to be used:
 
-* pspnet (needed the input dimensions to be dim % 192 == 0)
+* pspnet (needed the input dimensions to be dim % 192 == 0), and 512 % 192 != 0
