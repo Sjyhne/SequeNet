@@ -1,7 +1,7 @@
 # train.py
 
 from models.metrics import mean_iou
-from generator import create_dataset_generator, create_cityscapes_generator
+from generator import create_dataset_generator, create_cityscapes_generator, create_dataset_from_model
 from train_utils import calc_biou, remove_all_folders_in_path, store_images
 from train_utils import display_and_store_metrics, save_best_model, calculate_sample_weight
 
@@ -61,18 +61,16 @@ def train(args, train_ds, val_ds):
         0.00001,
         power=0.2)
     
-    if os.path.exists(os.path.join("model_output", args.model_type)):
-        shutil.rmtree(os.path.join("model_output", args.model_type))
+    if os.path.exists(os.path.join("model_output", "extra_" + args.model_type)):
+        shutil.rmtree(os.path.join("model_output", "extra_" + args.model_type))
         
-    os.mkdir(os.path.join("model_output", args.model_type))
+    os.mkdir(os.path.join("model_output", "extra_" + args.model_type))
     
-    with open(os.path.join("model_output", args.model_type, "args.json"), 'w') as f:
+    with open(os.path.join("model_output", "extra_" + args.model_type, "args.json"), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
-    main_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
-    main_loss_fn = get_loss_func(args.main_loss, args.main_label_smooth)
-    main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
+    main_model = tf.saved_model.load(args.load_path)
     
     if args.extra_model == True:
         extra_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
@@ -94,10 +92,10 @@ def train(args, train_ds, val_ds):
     extra_train_biou_metric = []
     extra_val_biou_metric = []
     
-    if os.path.exists("model_output/{args.model_type}/output_images/train/"):
-        remove_all_folders_in_path("model_output/{args.model_type}/output_images/train/")
-    if os.path.exists("model_output/{args.model_type}/output_images/val/"):
-        remove_all_folders_in_path("model_output/{args.model_type}/output_images/val/")
+    if os.path.exists(f"model_output/extra_ + {args.model_type}/output_images/train/"):
+        remove_all_folders_in_path(f"model_output/extra_ + {args.model_type}/output_images/train/")
+    if os.path.exists(f"model_output/extra_ + {args.model_type}/output_images/val/"):
+        remove_all_folders_in_path(f"model_output/extra_ + {args.model_type}/output_images/val/")
 
     epochs = args.epochs
     
@@ -156,7 +154,7 @@ def train(args, train_ds, val_ds):
         
         print("Current time taken since start:", round(time.time() - start, 3), "seconds")
         print("Estimated total time:", ((time.time() - start)/(epoch + 1)) * epochs, "seconds")
-        print("Current lr:", round(optimizer._decayed_lr(tf.float32).numpy(), 7))
+        print("Current lr:", round(learning_rate_fn(epoch).numpy(), 7))
         
         display_and_store_metrics(
             train_loss_metric, val_loss_metric,
@@ -207,14 +205,15 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", type=str, default="data/large_building_area/img_dir", help="Path to data used for training")
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
     parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
-    parser.add_argument("--extra_model", type=bool, default=False, help="Whether to use the extra neural network model")
-    parser.add_argument("--extra_model_type", type=str, default="fcn_8", help="What type of model the extra neural network should be")
-    parser.add_argument("--main_loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
-    parser.add_argument("--extra_loss", type=str, default="cce", help="The loss function to be used for the extra segmentation network")
-    parser.add_argument("--main_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
-    parser.add_argument("--extra_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the extra network")
+    parser.add_argument("--loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
+    parser.add_argument("--label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
+    parser.add_argument("--load_model", type=str, default="", help="The path to the model that should generate the dataset, if dataset not exist")
 
     args = parser.parse_args()
+    
+    # Check whether there already is a dataset stored from the model we want to train on, typically named vgg_unet_lba
+    # If not, then load the model from which we want to create a dataset for and then create the dataset by 
+    # predicting and storing the results in a folder
 
     if args.dataset == "lba":
         train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
@@ -224,5 +223,26 @@ if __name__ == "__main__":
         train_ds = create_cityscapes_generator("train")
         val_ds = create_cityscapes_generator("val")
         test_ds = create_cityscapes_generator("test")
-
+        
+    # load main model here and perform dataset generation
+    
+    if args.load_model != "":
+        model_path = os.path.join("model_output", args.load_model)
+        for file in os.listdir(model_path):
+            if "best_model" in file:
+                model_path = os.path.join("model_output", args.load_model, file)
+        print("Found this model:", model_path)
+        try:
+            loaded_model = tf.saved_model.load(args.load_path)
+        except Exception as e:
+            print("Something went wrong loading", model_path, "|", args.load_model)
+            exit()
+        create_dataset_from_model(loaded_model, train_ds, "train", args)
+        create_dataset_from_model(loaded_model, val_ds, "val", args)
+        create_dataset_from_model(loaded_model, test_ds, "test", args)
+    else:
+        print("Not supported anything other than using load_path")
+        exit()
+        
+    
     train(args, train_ds, val_ds)

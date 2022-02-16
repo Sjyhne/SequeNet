@@ -1,2 +1,2 @@
 from .dataset import ImageDataset
-from .generator import create_dataset_generator, create_cityscapes_generator
+from .generator import create_dataset_generator, create_cityscapes_generator, create_dataset_from_model

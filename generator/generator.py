@@ -33,6 +33,17 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
     
     return image_dataset
 
+def create_dataset_from_model(model, dataset, dataset_type, args):
+    c = 0
+    for (imgs, anns) in dataset:
+        preds = model(imgs)
+        logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(preds[:, :, :, 1], 0.3, 1.0), axis=-1))/255
+        for i, logit in enumerate(logits):
+            plt.imsave(os.path.join("data", args.model_type + "_large_buidling_area", "img_dir", dataset_type, str(c) + ".png"), logit)
+            plt.imsave(os.path.join("data", args.model_type + "_large_buidling_area", "ann_dir", dataset_type, str(c) + ".png"), anns[i])
+            c += 1
+            exit()
+
 
 def patchify_images(tupl):
 
