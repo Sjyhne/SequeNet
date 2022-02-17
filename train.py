@@ -58,8 +58,8 @@ def train(args, train_ds, val_ds):
     learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(
         args.init_lr,
         args.epochs * len(train_ds),
-        0.00001,
-        power=0.2)
+        0.00005,
+        power=0.5)
     
     if os.path.exists(os.path.join("model_output", args.model_type)):
         shutil.rmtree(os.path.join("model_output", args.model_type))
@@ -70,7 +70,7 @@ def train(args, train_ds, val_ds):
         json.dump(args.__dict__, f, indent=2)
 
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
-    main_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
+    main_optimizer = tf.keras.optimizers.Adam(learning_rate=args.init_lr)
     main_loss_fn = get_loss_func(args.main_loss, args.main_label_smooth)
     main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
     
@@ -111,7 +111,7 @@ def train(args, train_ds, val_ds):
     for epoch in range(epochs):
         print(f"Epoch: {epoch}/{epochs}")
         print()
-        for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
+        for step, (imgs, anns, names) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             if args.extra_model == True and epoch >= main_model_pretraining:
@@ -128,12 +128,13 @@ def train(args, train_ds, val_ds):
             train_loss_metric.append(loss)
             train_miou_metric.append(miou)
             train_biou_metric.append(biou)
+            main_optimizer.learning_rate = learning_rate_fn((epoch * len(train_ds)) + step)
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(train_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits)
+                    store_images(f"model_output/{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
 
         
-        for step, (imgs, anns) in enumerate(val_ds):
+        for step, (imgs, anns, names) in enumerate(val_ds):
             loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             if args.extra_model == True and epoch >= main_model_pretraining:
@@ -152,11 +153,12 @@ def train(args, train_ds, val_ds):
             val_biou_metric.append(biou)
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(val_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits)
+                    store_images(f"model_output/{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
+        
         
         print("Current time taken since start:", round(time.time() - start, 3), "seconds")
         print("Estimated total time:", ((time.time() - start)/(epoch + 1)) * epochs, "seconds")
-        print("Current lr:", round(optimizer._decayed_lr(tf.float32).numpy(), 7))
+        print("Current lr:", round(learning_rate_fn((epoch * len(train_ds)) + len(train_ds)).numpy(), 7))
         
         display_and_store_metrics(
             train_loss_metric, val_loss_metric,

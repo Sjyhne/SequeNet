@@ -1,10 +1,12 @@
 import tensorflow_datasets as tfds
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from .dataset import ImageDataset
 
 import os
+import shutil
 
 split_images_to_half = lambda x: (tf.reshape(
     tf.image.extract_patches(
@@ -34,15 +36,41 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
     return image_dataset
 
 def create_dataset_from_model(model, dataset, dataset_type, args):
-    c = 0
-    for (imgs, anns) in dataset:
+    base_path = os.path.join("data", args.load_model + "_large_building_area")
+    
+    if os.path.exists(base_path) and args.overwrite_dataset == False:
+        print("Data already exists, and overwrite is False")
+        
+        return create_dataset_generator(os.path.join(base_path, "img_dir"), dataset_type, args.batch_size, data_percentage=args.data_percentage)
+    
+    # Create folder for data if not exist, delete if already exist
+    if os.path.exists(os.path.join(base_path, "img_dir", dataset_type)):
+        shutil.rmtree(os.path.join(base_path, "img_dir", dataset_type))
+        shutil.rmtree(os.path.join(base_path, "ann_dir", dataset_type))
+        shutil.rmtree(os.path.join(base_path, "mask_dir", dataset_type))
+        shutil.rmtree(os.path.join(base_path, "grad_dir", dataset_type))
+        
+        
+    
+    os.makedirs(os.path.join(base_path, "img_dir", dataset_type))
+    os.makedirs(os.path.join(base_path, "ann_dir", dataset_type))
+    os.makedirs(os.path.join(base_path, "mask_dir", dataset_type))
+    os.makedirs(os.path.join(base_path, "grad_dir", dataset_type))
+    
+    for step, (imgs, anns, names) in tqdm(enumerate(dataset), total=len(dataset)):
         preds = model(imgs)
+        anns = tf.math.argmax(anns, axis=-1)
+        masks = tf.math.argmax(preds, axis=-1)
+        grads = preds[:, :, :, 1]
         logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(preds[:, :, :, 1], 0.3, 1.0), axis=-1))/255
         for i, logit in enumerate(logits):
-            plt.imsave(os.path.join("data", args.model_type + "_large_buidling_area", "img_dir", dataset_type, str(c) + ".png"), logit)
-            plt.imsave(os.path.join("data", args.model_type + "_large_buidling_area", "ann_dir", dataset_type, str(c) + ".png"), anns[i])
-            c += 1
-            exit()
+            plt.imsave(os.path.join(base_path, "img_dir", dataset_type, names[i] + ".png"), logit.numpy())
+            plt.imsave(os.path.join(base_path, "ann_dir", dataset_type, names[i] + ".png"), anns[i].numpy())
+            plt.imsave(os.path.join(base_path, "mask_dir", dataset_type, names[i] + ".png"), masks[i].numpy())
+            plt.imsave(os.path.join(base_path, "grad_dir", dataset_type, names[i] + ".png"), grads[i].numpy())
+            
+    
+    return create_dataset_generator(os.path.join(base_path, "img_dir"), dataset_type, args.batch_size, data_percentage=args.data_percentage)
 
 
 def patchify_images(tupl):

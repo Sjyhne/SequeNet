@@ -35,13 +35,13 @@ def remove_all_folders_in_path(path):
         if os.path.isdir(os.path.join(path, folder)):
             shutil.rmtree(os.path.join(path, folder))
 
-def store_images(path, anns, imgs, pred_images, extra_pred_images=None):
+def store_images(path, anns, imgs, pred_images, names, extra_pred_images=None):
     os.makedirs(path)
     anns = tf.math.argmax(anns, axis=-1)
     if extra_pred_images == None:
         highlighted_images = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(pred_images[:, :, :, 1], 0.3, 1.0), axis=-1))/255
-        pred_images = tf.expand_dims(tf.math.argmax(pred_images, axis=-1), axis=-1)
         main_build_gradients = tf.expand_dims(pred_images[:, :, :, 1], axis=-1)
+        pred_images = tf.expand_dims(tf.math.argmax(pred_images, axis=-1), axis=-1)
         for i, pi in enumerate(pred_images):
             fig = plt.figure(constrained_layout=True)
             gs = GridSpec(3, 2, figure=fig)
@@ -62,7 +62,7 @@ def store_images(path, anns, imgs, pred_images, extra_pred_images=None):
             fig.axes[4].imshow(main_build_gradients[i])
             fig.axes[4].set_title("Build Gradients")
             
-            plt.savefig(os.path.join(path, f"{i}_.png"), dpi=200)
+            plt.savefig(os.path.join(path, f"{names[i]}.png"), dpi=200)
             plt.close()
     else:    
         highlighted_images = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(pred_images[:, :, :, 1], 0.3, 1.0), axis=-1))/255
@@ -121,7 +121,7 @@ def save_best_model(model, loss_value, best_loss_value, epoch, name, args):
             if "best_model" in file:
                 shutil.rmtree(os.path.join(path, file))
         save_path = os.path.join(path, f"{name}_best_model_{epoch}")
-        tf.saved_model.save(model, save_path)
+        tf.keras.models.save_model(model, save_path)
         return loss_value
     else:
         return best_loss_value

@@ -58,7 +58,7 @@ def train(args, train_ds, val_ds):
     learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(
         args.init_lr,
         args.epochs * len(train_ds),
-        0.00001,
+        args.end_lr,
         power=0.2)
     
     if os.path.exists(os.path.join("model_output", "extra_" + args.model_type)):
@@ -98,8 +98,6 @@ def train(args, train_ds, val_ds):
         remove_all_folders_in_path(f"model_output/extra_ + {args.model_type}/output_images/val/")
 
     epochs = args.epochs
-    
-    main_model_pretraining = 20
     
     best_loss_value = 100_000
     extra_best_loss_value = 100_000
@@ -206,15 +204,15 @@ if __name__ == "__main__":
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
     parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
     parser.add_argument("--loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
-    parser.add_argument("--label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
+    parser.add_argument("--label_smooth", type=float, default=0.2, help="The label smoothing value for the loss function for the main network")
     parser.add_argument("--load_model", type=str, default="", help="The path to the model that should generate the dataset, if dataset not exist")
+    parser.add_argument("--overwrite_dataset", type=bool, default=False, help="Whether we should overwrite the data if it already exists")
+    parser.add_argument("--end_lr", type=float, default=1e-5, help="Finishing value of the learning rate when the training is finished")
 
     args = parser.parse_args()
     
-    # Check whether there already is a dataset stored from the model we want to train on, typically named vgg_unet_lba
-    # If not, then load the model from which we want to create a dataset for and then create the dataset by 
-    # predicting and storing the results in a folder
-
+    # load main model here and perform dataset generation
+    
     if args.dataset == "lba":
         train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
         val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
@@ -223,8 +221,6 @@ if __name__ == "__main__":
         train_ds = create_cityscapes_generator("train")
         val_ds = create_cityscapes_generator("val")
         test_ds = create_cityscapes_generator("test")
-        
-    # load main model here and perform dataset generation
     
     if args.load_model != "":
         model_path = os.path.join("model_output", args.load_model)
@@ -233,13 +229,17 @@ if __name__ == "__main__":
                 model_path = os.path.join("model_output", args.load_model, file)
         print("Found this model:", model_path)
         try:
-            loaded_model = tf.saved_model.load(args.load_path)
+            loaded_model = tf.keras.models.load_model(model_path)
+            print("Successfully loaded model", args.load_model, "from", model_path)
         except Exception as e:
             print("Something went wrong loading", model_path, "|", args.load_model)
+            print(e)
             exit()
-        create_dataset_from_model(loaded_model, train_ds, "train", args)
-        create_dataset_from_model(loaded_model, val_ds, "val", args)
-        create_dataset_from_model(loaded_model, test_ds, "test", args)
+        train_ds = create_dataset_from_model(loaded_model, train_ds, "train", args)
+        val_ds = create_dataset_from_model(loaded_model, val_ds, "val", args)
+        test_ds = create_dataset_from_model(loaded_model, test_ds, "test", args)
+        print("Created dataset from model")
+        exit()
     else:
         print("Not supported anything other than using load_path")
         exit()

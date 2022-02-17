@@ -66,15 +66,17 @@ class ImageDataset:
         label_paths = self.label_batches[idx]
         imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
         labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 2))
+        names = []
         for i in range(self.bsize):
             img = cv.imread(image_paths[i], cv.IMREAD_COLOR)
             lab = tf.keras.utils.to_categorical(cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE).reshape(self.img_size[0], self.img_size[1], 1), 2)
             imgs[i] = img
             labs[i] = lab
+            names.append(image_paths[i].split("/")[-1].split(".")[0])
         tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.int64)
         tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
         
-        return tensor_imgs, tensor_labs
+        return tensor_imgs, tensor_labs, names
 
 if __name__ == "__main__":
     pass
