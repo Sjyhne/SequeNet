@@ -42,6 +42,25 @@ https://github.com/divamgupta/image-segmentation-keras
 * deeplab
 * hrnet
 
-### Not to be used:
+## Benchmark command:
 
-* pspnet (needed the input dimensions to be dim % 192 == 0), and 512 % 192 != 0
+> python train.py --epochs 50 --init_lr 3e-3 --image_dim 512 --num_channels 3 --model_type deeplab --batch_size 8 --data_path data/large_building_area/img_dir --data_percentage 1.0 --dataset l
+ba --main_loss cce
+
+With the following values for each arg
+
+| field | value |
+|-------|-------|
+|epochs | 50    |
+|init_lr| 0.003 |
+|image_dim|512|
+|num_channels|3|
+|num_classes|2|
+|model_type|deeplab|
+|batch_size|8|
+|data_path|"data/large_building_area/img_dir"|
+|data_percentage|1|
+|loss|"cce"|
+|label_smooth|0|
+|end_lr|1e-5|
+|lr_decay_power|0.5|
