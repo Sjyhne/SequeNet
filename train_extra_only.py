@@ -22,14 +22,14 @@ import time
 
 NUM_CLASSES = 2
 
-def train_step(m, x, y, loss_func, optimizer, dist_map, args):
+def train_step(m, x, y, loss_func, cce_loss, optimizer, dist_map, args):
     with tf.GradientTape()  as tape:
         logits = m(x, training=True)
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-        if args.loss == "tfabl":
-            loss_val = loss_func(y, logits, dist_map)
-        else:
-            loss_val = loss_func(y, logits)
+        loss_val = cce_loss(y, logits)
+        if args.loss == "abl":
+            abl_val = abl_func(y, logits, dist_map)
+            loss_val = loss_val + abl_val
 
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
@@ -174,9 +174,9 @@ if __name__ == "__main__":
     # load main model here and perform dataset generation
     
     if args.dataset == "lba":
-        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
-        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
-        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
+        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=True)
+        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=True)
+        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=True)
     elif args.dataset == "cityscapes":
         train_ds = create_cityscapes_generator("train")
         val_ds = create_cityscapes_generator("val")

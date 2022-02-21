@@ -44,10 +44,39 @@ import numpy as np
 import tensorflow as tf
 from scipy.ndimage import distance_transform_edt as distance
 import cv2 as cv
-
+from operator import itemgetter
 from tqdm import tqdm
 import os
 import json
+
+# Tools
+def kl_div(a,b): # q,p
+    return tf.nn.softmax(b, axis=1) * (tf.nn.log_softmax(b, axis=1) - tf.nn.log_softmax(a, axis=1))   
+
+def one_hot2dist(seg):
+    res = np.zeros_like(seg)
+    for i in range(len(seg)):
+        posmask = seg[i].astype(np.bool)
+        if posmask.any():
+            negmask = ~posmask
+            res[i] = distance(negmask) * negmask - (distance(posmask) - 1) * posmask
+    return res
+
+def class2one_hot(seg, C):
+    seg = tf.expand_dims(seg, axis=0) if len(seg.shape) == 2 else seg
+    res = tf.cast(tf.stack([seg == c for c in range(C)], axis=1), tf.int32)
+    return res
+
+def dist_map_transform(value):
+    value = tf.expand_dims(value, axis=0)
+    value = tf.cast(value, dtype=tf.int64)
+    value = class2one_hot(value, C=1)
+    getter = itemgetter(0)
+    value = getter(value)
+    #value = value.cpu().numpy()
+    value = value.numpy()
+    value = one_hot2dist(value)
+    return tf.convert_to_tensor(value, dtype=tf.float32)
 
 def calc_dist_map(seg):
     res = np.zeros_like(seg)
@@ -61,7 +90,7 @@ def calc_dist_map(seg):
     
     return res
 
-def get_abl_dist_maps(self, target):
+def get_abl_dist_maps(target):
     #target_detach = target.clone().detach()
     target_detach = target
     dist_maps = tf.concat([dist_map_transform(target_detach[i]) for i in range(target_detach.shape[0])], axis=0)
@@ -70,7 +99,7 @@ def get_abl_dist_maps(self, target):
 
     return out
 
-def gt2boundary(self, gt, ignore_label=-1):  # gt NHW
+def gt2boundary(gt, ignore_label=-1):  # gt NHW
     gt_lr = gt[:,1:,:]-gt[:,:-1,:]  # NHW
     gt_ud = gt[:,:,1:]-gt[:,:,:-1]
 
@@ -94,14 +123,15 @@ def gt2boundary(self, gt, ignore_label=-1):  # gt NHW
 
 def calc_abl_dist_map(seg):
     
-    if len(target.shape) == 4:
-        target = tf.math.argmax(target, axis=-1)
+    if len(seg.shape) == 4:
+        target = tf.math.argmax(seg, axis=-1)
 
-    gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
-
-    #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
-    dist_maps = self.get_dist_maps(gt_boundary)
+    gt_boundary = gt2boundary(seg, ignore_label=255)
     
+    #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
+    dist_maps = get_abl_dist_maps(gt_boundary)
+    
+    return dist_maps
     # TODO: Continue here by implementing the dist-generation
         
 
@@ -121,7 +151,7 @@ def generate_dist_maps(mask_folder):
                 lab[lab == 30] = 0
                 lab[lab == 215] = 1
             #lab = tf.keras.utils.to_categorical(lab, num_classes=2)
-            dist_map = calc_dist_map(lab)
+            dist_map = calc_abl_dist_map(lab)[0]
             np.save(os.path.join(mask_folder, file.split(".")[0] + ".npz"), dist_map)
             
 def create_dataset_from_model(dataset, dataset_type, args):

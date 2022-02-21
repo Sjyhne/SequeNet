@@ -9,7 +9,7 @@ import os
 import shutil
 import csv
 
-from models.losses import ABL, surface_loss_keras
+from models.losses import ABL
 
 from models.metrics import boundary_iou
 
@@ -22,13 +22,13 @@ pylab.rcParams.update(params)
 
 def get_loss_func(loss, label_smoothing=0.0):
     if loss == "abl":
-        return ABL(label_smoothing=label_smoothing)
+        return ABL(label_smoothing=0)
     elif loss == "cce":
         return tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=label_smoothing)
     elif loss == "scce":
         return tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    elif loss == "tfabl":
-        return surface_loss_keras
+    #elif loss == "tfabl":
+    #    return surface_loss_keras
     else:
         raise RuntimeError("Did not provide an implemented loss function")
 

@@ -144,7 +144,7 @@ import tensorflow as tf
 from scipy.ndimage import distance_transform_edt as distance
 
 
-def calc_dist_map(seg):
+"""def calc_dist_map(seg):
     res = np.zeros_like(seg)
     posmask = seg.astype(np.bool)
 
@@ -173,7 +173,7 @@ class TFABL(tf.keras.losses.Loss):
         ...
     
     def call(self, target, logits):
-        return surface_loss_keras(target, logits)
+        return surface_loss_keras(target, logits)"""
 
 
 # Active Boundary Loss
@@ -334,15 +334,15 @@ class ABL(tf.keras.losses.Loss):
         
         return out
 
-    def call(self, target, logits):
+    def call(self, target, logits, dist_maps):
         logits = tf.transpose(logits, perm=[0, 3, 1, 2])
 
-        if len(target.shape) > 3:
-            target = tf.math.argmax(target, axis=-1)
+        #if len(target.shape) > 3:
+        #    target = tf.math.argmax(target, axis=-1)
         
-        gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
+        #gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
 
-        dist_maps = self.get_dist_maps(gt_boundary)
+        #dist_maps = self.get_dist_maps(gt_boundary)
 
         pred_boundary = tf.cast(self.logits2boundary(logits), dtype=tf.int16)
         if tf.math.reduce_sum(pred_boundary) < 1: # avoid nan

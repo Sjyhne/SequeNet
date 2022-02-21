@@ -94,10 +94,10 @@ def train(args, train_ds, val_ds):
     extra_train_biou_metric = []
     extra_val_biou_metric = []
     
-    if os.path.exists("model_output/{args.model_type}/output_images/train/"):
-        remove_all_folders_in_path("model_output/{args.model_type}/output_images/train/")
-    if os.path.exists("model_output/{args.model_type}/output_images/val/"):
-        remove_all_folders_in_path("model_output/{args.model_type}/output_images/val/")
+    if os.path.exists(f"model_output/main_{args.model_type}/output_images/train/"):
+        remove_all_folders_in_path(f"model_output/main_{args.model_type}/output_images/train/")
+    if os.path.exists(f"model_output/main_{args.model_type}/output_images/val/"):
+        remove_all_folders_in_path(f"model_output/main_{args.model_type}/output_images/val/")
 
     epochs = args.epochs
     
@@ -123,7 +123,7 @@ def train(args, train_ds, val_ds):
                 extra_train_miou_metric.append(miou)
                 extra_train_biou_metric.append(biou)
                 if step == len(train_ds) - 1:
-                    store_images(f"model_output/main_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
+                    store_images(f"model_output/extra_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
             train_loss_metric.append(loss)
             train_miou_metric.append(miou)
@@ -132,7 +132,7 @@ def train(args, train_ds, val_ds):
             #print(main_optimizer.learning_rate)
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(train_ds) - 1:
-                    store_images(f"model_output/extra_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
+                    store_images(f"model_output/main_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
 
         
         for step, (imgs, anns, names, _) in enumerate(val_ds):
@@ -147,14 +147,14 @@ def train(args, train_ds, val_ds):
                 extra_val_miou_metric.append(miou)
                 extra_val_biou_metric.append(biou)
                 if step == len(val_ds) - 1:
-                    store_images(f"model_output/main_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
+                    store_images(f"model_output/extra_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
             val_loss_metric.append(loss)
             val_miou_metric.append(miou)
             val_biou_metric.append(biou)
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(val_ds) - 1:
-                    store_images(f"model_output/extra_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
+                    store_images(f"model_output/main_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
         
         
         print("Current time taken since start:", round(time.time() - start, 3), "seconds")
