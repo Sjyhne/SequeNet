@@ -23,26 +23,132 @@ split_images_to_half = lambda x: (tf.reshape(
         padding='VALID'), (8, 512, 512, 1))
 )
 
-def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512, 512), data_percentage=1.0):
+def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512, 512), data_percentage=1.0, create_dist=False):
     
     heigth, width = image_size
 
     data_dir = os.path.join(datapath, datatype)
 
     img_paths = [os.path.join(data_dir, file) for file in os.listdir(data_dir) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
+    
+    if create_dist:
+        print(os.path.join("/".join(datapath.split("/")[:-1]), "ann_dir", datatype))
+        generate_dist_maps(os.path.join("/".join(datapath.split("/")[:-1]), "ann_dir", datatype))
 
     image_dataset = ImageDataset(img_paths, batch_size, (heigth, width), data_percentage)
     
     return image_dataset
 
-def create_dataset_from_model(model, dataset, dataset_type, args):
+from keras import backend as K
+import numpy as np
+import tensorflow as tf
+from scipy.ndimage import distance_transform_edt as distance
+import cv2 as cv
+
+from tqdm import tqdm
+import os
+import json
+
+def calc_dist_map(seg):
+    res = np.zeros_like(seg)
+    posmask = seg.astype(np.bool)
+
+    if posmask.any():
+        negmask = ~posmask
+        res = distance(negmask) * negmask - (distance(posmask) - 1) * posmask
+       
+        res = res / np.amax(res)
+    
+    return res
+
+def get_abl_dist_maps(self, target):
+    #target_detach = target.clone().detach()
+    target_detach = target
+    dist_maps = tf.concat([dist_map_transform(target_detach[i]) for i in range(target_detach.shape[0])], axis=0)
+    out = -dist_maps
+    out = tf.where(out>0, out, tf.zeros_like(out))
+
+    return out
+
+def gt2boundary(self, gt, ignore_label=-1):  # gt NHW
+    gt_lr = gt[:,1:,:]-gt[:,:-1,:]  # NHW
+    gt_ud = gt[:,:,1:]-gt[:,:,:-1]
+
+    gt_lr = tf.cast(gt_lr, dtype=tf.int16)
+    gt_ud = tf.cast(gt_ud, dtype=tf.int16)
+    gt_lr = tf.pad(gt_lr, [[0,0],[0,1],[0,0]], mode='CONSTANT', constant_values=0) != 0 
+    gt_ud = tf.pad(gt_ud, [[0,0],[0,0],[0,1]], mode='CONSTANT', constant_values=0) != 0
+    gt_lr = tf.cast(gt_lr, dtype=tf.int16)
+    gt_ud = tf.cast(gt_ud, dtype=tf.int16)
+
+    gt_combine = gt_lr+gt_ud
+    del gt_lr
+    del gt_ud
+
+    gt = tf.cast(gt, dtype=tf.int16)
+
+    # set 'ignore area' to all boundary
+    gt_combine += tf.cast((gt==ignore_label), dtype=tf.int16)
+
+    return gt_combine > 0
+
+def calc_abl_dist_map(seg):
+    
+    if len(target.shape) == 4:
+        target = tf.math.argmax(target, axis=-1)
+
+    gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
+
+    #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
+    dist_maps = self.get_dist_maps(gt_boundary)
+    
+    # TODO: Continue here by implementing the dist-generation
+        
+
+def calc_dist_map_batch(y_true):
+    y_true_numpy = y_true.numpy()
+    return_array = np.array([calc_dist_map(y) for y in y_true_numpy]).astype(np.float32)
+    normalized_return_array = return_array / np.amax(return_array)
+
+def generate_dist_maps(mask_folder):
+    dist_maps = {}
+    
+    for _, file in tqdm(enumerate(os.listdir(mask_folder)), total=len(os.listdir(mask_folder))):
+        if file.split(".")[-1] == "tiff":
+            lab = cv.imread(os.path.join(mask_folder, file), cv.IMREAD_GRAYSCALE)
+            lab = lab.reshape(lab.shape[0], lab.shape[1], 1)
+            if lab[0, 0] > 1:
+                lab[lab == 30] = 0
+                lab[lab == 215] = 1
+            #lab = tf.keras.utils.to_categorical(lab, num_classes=2)
+            dist_map = calc_dist_map(lab)
+            np.save(os.path.join(mask_folder, file.split(".")[0] + ".npz"), dist_map)
+            
+def create_dataset_from_model(dataset, dataset_type, args):
     base_path = os.path.join("data", args.load_model + "_large_building_area")
+    
+    print(args)
     
     if os.path.exists(base_path) and args.overwrite_dataset == False:
         print("Data already exists, and overwrite is False")
         
         return create_dataset_generator(os.path.join(base_path, "img_dir"), dataset_type, args.batch_size, data_percentage=args.data_percentage)
     
+    print("Please dont go here")
+    exit()
+    
+    model_path = os.path.join("model_output", args.load_model)
+    for file in os.listdir(model_path):
+        if "best_model" in file:
+            model_path = os.path.join("model_output", args.load_model, file)
+    print("Found this model:", model_path)
+    try:
+        model = tf.keras.models.load_model(model_path)
+        print("Successfully loaded model", args.load_model, "from", model_path)
+    except Exception as e:
+        print("Something went wrong loading", model_path, "|", args.load_model)
+        print(e)
+        exit()
     # Create folder for data if not exist, delete if already exist
     if os.path.exists(os.path.join(base_path, "img_dir", dataset_type)):
         shutil.rmtree(os.path.join(base_path, "img_dir", dataset_type))

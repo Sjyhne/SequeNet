@@ -40,9 +40,48 @@ def dist_map_transform(value):
     value = one_hot2dist(value)
     return tf.convert_to_tensor(value, dtype=tf.float32)
 
+
+from keras import backend as K
+import numpy as np
+import tensorflow as tf
+from scipy.ndimage import distance_transform_edt as distance
+
+
+def calc_dist_map(seg):
+    res = np.zeros_like(seg)
+    posmask = seg.astype(np.bool)
+
+    if posmask.any():
+        negmask = ~posmask
+        res = distance(negmask) * negmask - (distance(posmask) - 1) * posmask
+
+    return res
+
+
+def calc_dist_map_batch(y_true):
+    y_true_numpy = y_true.numpy()
+    return np.array([calc_dist_map(y)
+                     for y in y_true_numpy]).astype(np.float32)
+
+
+def surface_loss_keras(y_true, y_pred, distmap):
+    #y_true_dist_map = tf.py_function(func=calc_dist_map_batch,
+    #                                 inp=[y_true],
+    #                                 Tout=tf.float32)
+    multipled = y_pred * distmap
+    return K.mean(multipled)
+
+class TFABL(tf.keras.losses.Loss):
+    def __init__(self):
+        ...
+    
+    def call(self, target, logits):
+        return surface_loss_keras(target, logits)
+
+
 # Active Boundary Loss
 class ABL(tf.keras.losses.Loss):
-    def __init__(self, isdetach=True, max_N_ratio = 1/100, ignore_label = 255, label_smoothing=0.2, weight = None, max_clip_dist = 20.):
+    def __init__(self, isdetach=True, max_N_ratio = 1/100, ignore_label = 0, label_smoothing=0.2, weight = None, max_clip_dist = 20.):
         super(ABL, self).__init__()
         self.ignore_label = ignore_label
         self.label_smoothing = label_smoothing
@@ -224,12 +263,13 @@ class ABL(tf.keras.losses.Loss):
         logits = tf.transpose(logits, perm=[0, 3, 1, 2])
         
         if len(target.shape) == 4:
-            target = tf.squeeze(target, axis=-1)
+            target = tf.math.argmax(target, axis=-1)
 
         gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
 
         #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
         dist_maps = self.get_dist_maps(gt_boundary)
+        
         pred_boundary = tf.cast(self.logits2boundary(logits), dtype=tf.int16)
         if tf.math.reduce_sum(pred_boundary) < 1: # avoid nan
             return None # you should check in the outside. if None, skip this loss.

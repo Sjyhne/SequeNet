@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 import random
 import os
+import json
 
 class ImageDataset:
     def __init__(self, image_paths, bsize, img_size, data_percentage=1.0) -> None:
@@ -14,7 +15,7 @@ class ImageDataset:
         self.label_paths = self.get_label_paths()
         self.bsize = bsize
         self.img_size = img_size
-
+    
         self.image_batches, self.label_batches = self.generate_batches()
     
     def get_label_path(self, path):
@@ -67,16 +68,23 @@ class ImageDataset:
         imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
         labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 2))
         names = []
+        dist_maps = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 1))
         for i in range(self.bsize):
             img = cv.imread(image_paths[i], cv.IMREAD_COLOR)
-            lab = tf.keras.utils.to_categorical(cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE).reshape(self.img_size[0], self.img_size[1], 1), 2)
+            lab = cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE)
+            lab = lab.reshape(self.img_size[0], self.img_size[1], 1)
+            if lab[0, 0] > 1:
+                lab[lab == 30] = 0
+                lab[lab == 215] = 1
+            lab = tf.keras.utils.to_categorical(lab, num_classes=2)
             imgs[i] = img
             labs[i] = lab
             names.append(image_paths[i].split("/")[-1].split(".")[0])
+            dist_maps[i] = np.load(os.path.join("data/large_building_area/ann_dir", "/".join(label_paths[i].split("/")[-2:]).split(".")[0] + ".npz.npy"))
         tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.int64)
         tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
         
-        return tensor_imgs, tensor_labs, names
+        return tensor_imgs, tensor_labs, names, dist_maps
 
 if __name__ == "__main__":
     pass

@@ -111,7 +111,7 @@ def train(args, train_ds, val_ds):
     for epoch in range(epochs):
         print(f"Epoch: {epoch}/{epochs}")
         print()
-        for step, (imgs, anns, names) in tqdm(enumerate(train_ds), total=len(train_ds)):
+        for step, (imgs, anns, names, _) in tqdm(enumerate(train_ds), total=len(train_ds)):
             loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             if args.extra_model == True and epoch >= main_model_pretraining:
@@ -123,18 +123,19 @@ def train(args, train_ds, val_ds):
                 extra_train_miou_metric.append(miou)
                 extra_train_biou_metric.append(biou)
                 if step == len(train_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
+                    store_images(f"model_output/main_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
             train_loss_metric.append(loss)
             train_miou_metric.append(miou)
             train_biou_metric.append(biou)
-            main_optimizer.learning_rate = learning_rate_fn((epoch * len(train_ds)) + step)
+            #main_optimizer.learning_rate = learning_rate_fn((epoch * len(train_ds)) + step)
+            #print(main_optimizer.learning_rate)
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(train_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
+                    store_images(f"model_output/extra_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
 
         
-        for step, (imgs, anns, names) in enumerate(val_ds):
+        for step, (imgs, anns, names, _) in enumerate(val_ds):
             loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             if args.extra_model == True and epoch >= main_model_pretraining:
@@ -146,19 +147,19 @@ def train(args, train_ds, val_ds):
                 extra_val_miou_metric.append(miou)
                 extra_val_biou_metric.append(biou)
                 if step == len(val_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
+                    store_images(f"model_output/main_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
             val_loss_metric.append(loss)
             val_miou_metric.append(miou)
             val_biou_metric.append(biou)
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(val_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
+                    store_images(f"model_output/extra_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
         
         
         print("Current time taken since start:", round(time.time() - start, 3), "seconds")
         print("Estimated total time:", ((time.time() - start)/(epoch + 1)) * epochs, "seconds")
-        print("Current lr:", round(learning_rate_fn((epoch * len(train_ds)) + len(train_ds)).numpy(), 7))
+        #print("Current lr:", round(learning_rate_fn((epoch * len(train_ds)) + len(train_ds)).numpy(), 7))
         
         display_and_store_metrics(
             train_loss_metric, val_loss_metric,

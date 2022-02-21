@@ -22,11 +22,14 @@ import time
 
 NUM_CLASSES = 2
 
-def train_step(m, x, y, loss_func, optimizer):
+def train_step(m, x, y, loss_func, optimizer, dist_map, args):
     with tf.GradientTape()  as tape:
         logits = m(x, training=True)
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-        loss_val = loss_func(y, logits)
+        if args.loss == "tfabl":
+            loss_val = loss_func(y, logits, dist_map)
+        else:
+            loss_val = loss_func(y, logits)
 
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
@@ -45,10 +48,13 @@ def compute_metrics(softmaxed_logits, anns):
     
     return miou, biou
 
-def evaluate_step(m, x, y, loss_func):
+def evaluate_step(m, x, y, loss_func, dist_map, args):
     logits = m(x, training=False)
     softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-    loss_val = loss_func(y, logits)
+    if args.loss == "tfabl":
+        loss_val = loss_func(y, logits, dist_map)
+    else:
+        loss_val = loss_func(y, logits)
     return loss_val, softmaxed_logits, logits
 
 def train(args, train_ds, val_ds):
@@ -70,12 +76,9 @@ def train(args, train_ds, val_ds):
         json.dump(args.__dict__, f, indent=2)
 
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
-    main_model = tf.saved_model.load(args.load_path)
-    
-    if args.extra_model == True:
-        extra_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
-        extra_loss_fn = get_loss_func(args.extra_loss, args.extra_label_smooth)
-        extra_model = model_from_name[args.extra_model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim, channels=args.num_channels)
+    main_optimizer = tf.keras.optimizers.Adam(learning_rate=args.init_lr)
+    main_loss_fn = get_loss_func(args.loss, args.label_smooth)
+    main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
         
     # Prepare the metrics.
     train_loss_metric = []
@@ -84,13 +87,7 @@ def train(args, train_ds, val_ds):
     val_miou_metric = []
     train_biou_metric = []
     val_biou_metric = []
-    
-    extra_train_loss_metric = []
-    extra_val_loss_metric = []
-    extra_train_miou_metric = []
-    extra_val_miou_metric = []
-    extra_train_biou_metric = []
-    extra_val_biou_metric = []
+
     
     if os.path.exists(f"model_output/extra_ + {args.model_type}/output_images/train/"):
         remove_all_folders_in_path(f"model_output/extra_ + {args.model_type}/output_images/train/")
@@ -107,48 +104,26 @@ def train(args, train_ds, val_ds):
     for epoch in range(epochs):
         print(f"Epoch: {epoch}/{epochs}")
         print()
-        for step, (imgs, anns) in tqdm(enumerate(train_ds), total=len(train_ds)):
-            loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer)
+        
+        for step, (imgs, anns, names, dist_map) in tqdm(enumerate(train_ds), total=len(train_ds)):
+            loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer, dist_map, args)
             miou, biou = compute_metrics(softmaxed_logits, anns)
-            if args.extra_model == True and epoch >= main_model_pretraining:
-                logits = tf.stop_gradient(softmaxed_logits)
-                logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(logits[:, :, :, 1], 0.3, 1.0), axis=-1))/255
-                extra_loss, extra_softmaxed_logits, extra_logits = train_step(extra_model, logits, anns, extra_loss_fn, extra_optimizer)
-                miou, biou = compute_metrics(extra_softmaxed_logits, anns)
-                extra_train_loss_metric.append(extra_loss)
-                extra_train_miou_metric.append(miou)
-                extra_train_biou_metric.append(biou)
-                if step == len(train_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
-
+            
             train_loss_metric.append(loss)
             train_miou_metric.append(miou)
             train_biou_metric.append(biou)
-            if args.extra_model == False or epoch < main_model_pretraining:
-                if step == len(train_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits)
-
+            if step == len(train_ds) - 1:
+                store_images(f"model_output/extra_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
         
-        for step, (imgs, anns) in enumerate(val_ds):
-            loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn)
+        for step, (imgs, anns, names, dist_map) in enumerate(val_ds):
+            loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn, dist_map, args)
             miou, biou = compute_metrics(softmaxed_logits, anns)
-            if args.extra_model == True and epoch >= main_model_pretraining:
-                logits = tf.stop_gradient(softmaxed_logits)
-                logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(logits[:, :, :, 1], 0.2, 1.0), axis=-1))/255
-                extra_loss, extra_softmaxed_logits, extra_logits = train_step(extra_model, logits, anns, extra_loss_fn, extra_optimizer)
-                miou, biou = compute_metrics(extra_softmaxed_logits, anns)
-                extra_val_loss_metric.append(extra_loss)
-                extra_val_miou_metric.append(miou)
-                extra_val_biou_metric.append(biou)
-                if step == len(val_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, extra_softmaxed_logits)
 
             val_loss_metric.append(loss)
             val_miou_metric.append(miou)
             val_biou_metric.append(biou)
-            if args.extra_model == False or epoch < main_model_pretraining:
-                if step == len(val_ds) - 1:
-                    store_images(f"model_output/{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits)
+            if step == len(val_ds) - 1:
+                store_images(f"model_output/extra_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
         
         print("Current time taken since start:", round(time.time() - start, 3), "seconds")
         print("Estimated total time:", ((time.time() - start)/(epoch + 1)) * epochs, "seconds")
@@ -158,20 +133,10 @@ def train(args, train_ds, val_ds):
             train_loss_metric, val_loss_metric,
             train_miou_metric, val_miou_metric,
             train_biou_metric, val_biou_metric,
-            "main", args
+            "extra", args
         )
         
-        if args.extra_model == True and epoch >= main_model_pretraining:
-            display_and_store_metrics(
-                extra_train_loss_metric, extra_val_loss_metric,
-                extra_train_miou_metric, extra_val_miou_metric,
-                extra_train_biou_metric, extra_val_biou_metric,
-                "extra", args
-            )
-        
-        best_loss_value = save_best_model(main_model, round((sum(val_loss_metric)/len(val_loss_metric)).cpu().numpy(), 3), best_loss_value, epoch, "main", args)
-        if args.extra_model == True and epoch >= main_model_pretraining:
-            extra_best_loss_value = save_best_model(extra_model, round((sum(extra_val_loss_metric)/len(extra_val_loss_metric)).cpu().numpy(), 3), extra_best_loss_value, epoch, "extra", args)
+        best_loss_value = save_best_model(main_model, round((sum(val_loss_metric)/len(val_loss_metric)).numpy(), 3), best_loss_value, epoch, "extra", args)
 
         # Reset training metrics at the end of each epoch
         train_loss_metric = []
@@ -180,13 +145,6 @@ def train(args, train_ds, val_ds):
         val_miou_metric = []
         train_biou_metric = []
         val_biou_metric = []
-
-        extra_train_loss_metric = []
-        extra_val_loss_metric = []
-        extra_train_miou_metric = []
-        extra_val_miou_metric = []
-        extra_train_biou_metric = []
-        extra_val_biou_metric = []
 
 
 if __name__ == "__main__":
@@ -204,45 +162,34 @@ if __name__ == "__main__":
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
     parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
     parser.add_argument("--loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
-    parser.add_argument("--label_smooth", type=float, default=0.2, help="The label smoothing value for the loss function for the main network")
+    parser.add_argument("--label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
     parser.add_argument("--load_model", type=str, default="", help="The path to the model that should generate the dataset, if dataset not exist")
     parser.add_argument("--overwrite_dataset", type=bool, default=False, help="Whether we should overwrite the data if it already exists")
     parser.add_argument("--end_lr", type=float, default=1e-5, help="Finishing value of the learning rate when the training is finished")
+    parser.add_argument("--create_dist", type=bool, default=False, help="Whether or not to create distmaps for the dataset")
+
 
     args = parser.parse_args()
     
     # load main model here and perform dataset generation
     
     if args.dataset == "lba":
-        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
-        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
-        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage)
+        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
+        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
+        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
     elif args.dataset == "cityscapes":
         train_ds = create_cityscapes_generator("train")
         val_ds = create_cityscapes_generator("val")
         test_ds = create_cityscapes_generator("test")
     
     if args.load_model != "":
-        model_path = os.path.join("model_output", args.load_model)
-        for file in os.listdir(model_path):
-            if "best_model" in file:
-                model_path = os.path.join("model_output", args.load_model, file)
-        print("Found this model:", model_path)
-        try:
-            loaded_model = tf.keras.models.load_model(model_path)
-            print("Successfully loaded model", args.load_model, "from", model_path)
-        except Exception as e:
-            print("Something went wrong loading", model_path, "|", args.load_model)
-            print(e)
-            exit()
-        train_ds = create_dataset_from_model(loaded_model, train_ds, "train", args)
-        val_ds = create_dataset_from_model(loaded_model, val_ds, "val", args)
-        test_ds = create_dataset_from_model(loaded_model, test_ds, "test", args)
-        print("Created dataset from model")
-        exit()
+        train_ds = create_dataset_from_model(train_ds, "train", args)
+        val_ds = create_dataset_from_model(val_ds, "val", args)
+        test_ds = create_dataset_from_model(test_ds, "test", args)
     else:
-        print("Not supported anything other than using load_path")
+        print("Not supported anything other than using load_model")
         exit()
-        
+    
+    print(len(train_ds))
     
     train(args, train_ds, val_ds)

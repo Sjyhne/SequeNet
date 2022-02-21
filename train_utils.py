@@ -9,7 +9,7 @@ import os
 import shutil
 import csv
 
-from models.losses import ABL
+from models.losses import ABL, surface_loss_keras
 
 from models.metrics import boundary_iou
 
@@ -27,6 +27,8 @@ def get_loss_func(loss, label_smoothing=0.0):
         return tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=label_smoothing)
     elif loss == "scce":
         return tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    elif loss == "tfabl":
+        return surface_loss_keras
     else:
         raise RuntimeError("Did not provide an implemented loss function")
 
@@ -116,7 +118,7 @@ def calc_biou(pred_imgs, anns):
 
 def save_best_model(model, loss_value, best_loss_value, epoch, name, args):
     if loss_value < best_loss_value:
-        path = os.path.join("model_output", args.model_type)
+        path = os.path.join("model_output", name + "_" + args.model_type)
         for file in os.listdir(path):
             if "best_model" in file:
                 shutil.rmtree(os.path.join(path, file))
@@ -155,12 +157,12 @@ def display_and_store_metrics(tlm, vlm, tmm, vmm, tbm, vbm, name, args):
     print("Train biou: %.4f | Val biou: %.4f" % (float(train_biou), float(val_biou)))
     print()
     
-    store_path = os.path.join("model_output", args.model_type, "metrics")
+    store_path = os.path.join("model_output", name + "_" + args.model_type, "metrics")
     
     if not os.path.exists(store_path):
         os.makedirs(store_path)
 
-    fpath = f"model_output/{args.model_type}/metrics/{name}_metrics.csv"
+    fpath = f"model_output/{name}_{args.model_type}/metrics/{name}_metrics.csv"
 
     losses = [
         train_loss, val_loss,
