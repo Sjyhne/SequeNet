@@ -336,6 +336,9 @@ class ABL(tf.keras.losses.Loss):
 
     def call(self, target, logits):
         logits = tf.transpose(logits, perm=[0, 3, 1, 2])
+
+        if len(target.shape) > 3:
+            target = tf.math.argmax(target, axis=-1)
         
         gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
 
@@ -357,8 +360,8 @@ class ABL(tf.keras.losses.Loss):
 
 
 if __name__ == '__main__':
-    n,h,w,c = 1,100,100,2
-    gt = np.zeros((n,h,w))
+    n,h,w,c = 8,512,512,2
+    gt = np.zeros((n,h,w,c))
     gt[0,5:10] = 1
     gt[0,50:60] = 1
     gt = tf.convert_to_tensor(gt, dtype=tf.float32)
