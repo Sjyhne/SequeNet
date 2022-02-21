@@ -11,6 +11,103 @@ from operator import itemgetter
 
 import matplotlib.pyplot as plt
 
+def lovasz_grad(gt_sorted):
+    """
+    Computes gradient of the Lovasz extension w.r.t sorted errors
+    See Alg. 1 in paper
+    """
+    gts = tf.reduce_sum(gt_sorted)
+    intersection = gts - tf.cumsum(gt_sorted)
+    union = gts + tf.cumsum(1. - gt_sorted)
+    jaccard = 1. - intersection / union
+    jaccard = tf.concat((jaccard[0:1], jaccard[1:] - jaccard[:-1]), 0)
+    return jaccard
+
+def lovasz_softmax(labels, probas, classes='present', per_image=False, ignore=None, order='BCHW'):
+    """
+    Multi-class Lovasz-Softmax loss
+      probas: [B, H, W, C] or [B, C, H, W] Variable, class probabilities at each prediction (between 0 and 1)
+              Interpreted as binary (sigmoid) output with outputs of size [B, H, W].
+      labels: [B, H, W] Tensor, ground truth labels (between 0 and C - 1)
+      classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+      per_image: compute the loss per image instead of per batch
+      ignore: void class labels
+      order: use BHWC or BCHW
+    """
+    if per_image:
+        def treat_image(prob_lab):
+            prob, lab = prob_lab
+            prob, lab = tf.expand_dims(prob, 0), tf.expand_dims(lab, 0)
+            prob, lab = flatten_probas(prob, lab, ignore, order)
+            return lovasz_softmax_flat(prob, lab, classes=classes)
+        losses = tf.map_fn(treat_image, (probas, labels), dtype=tf.float32)
+        loss = tf.reduce_mean(losses)
+    else:
+        loss = lovasz_softmax_flat(probas, labels, classes=classes)
+    return loss
+
+
+def lovasz_softmax_flat(probas, labels, classes='present'):
+    """
+    Multi-class Lovasz-Softmax loss
+      probas: [P, C] Variable, class probabilities at each prediction (between 0 and 1)
+      labels: [P] Tensor, ground truth labels (between 0 and C - 1)
+      classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+    """
+    C = probas.shape[1]
+    losses = []
+    present = []
+    class_to_sum = list(range(C)) if classes in ['all', 'present'] else classes
+    for c in class_to_sum:
+        fg = tf.cast(tf.equal(labels, c), probas.dtype)  # foreground for class c
+        if classes == 'present':
+            present.append(tf.reduce_sum(fg) > 0)
+        if C == 1:
+            if len(classes) > 1:
+                raise ValueError('Sigmoid output possible only with 1 class')
+            class_pred = probas[:, 0]
+        else:
+            class_pred = probas[:, c]
+        errors = tf.abs(fg - class_pred)
+        errors_sorted, perm = tf.nn.top_k(errors, k=tf.shape(errors)[0], name="descending_sort_{}".format(c))
+        fg_sorted = tf.gather(fg, perm)
+        grad = lovasz_grad(fg_sorted)
+        losses.append(
+            tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1, name="loss_class_{}".format(c))
+                      )
+    if len(class_to_sum) == 1:  # short-circuit mean when only one class
+        return losses[0]
+    losses_tensor = tf.stack(losses)
+    if classes == 'present':
+        present = tf.stack(present)
+        losses_tensor = tf.boolean_mask(losses_tensor, present)
+    loss = tf.reduce_mean(losses_tensor)
+    return loss
+
+
+def flatten_probas(probas, labels, ignore=None, order='BHWC'):
+    """
+    Flattens predictions in the batch
+    """
+    if len(probas.shape) == 3:
+        probas, order = tf.expand_dims(probas, 3), 'BHWC'
+    if order == 'BCHW':
+        print(probas.shape)
+        probas = tf.transpose(probas, (0, 2, 3, 1), name="BCHW_to_BHWC")
+        order = 'BHWC'
+    if order != 'BHWC':
+        raise NotImplementedError('Order {} unknown'.format(order))
+    C = probas.shape[3]
+    probas = tf.reshape(probas, (-1, C))
+    labels = tf.reshape(labels, (-1,))
+    if ignore is None:
+        return probas, labels
+    valid = tf.not_equal(labels, ignore)
+    vprobas = tf.boolean_mask(probas, valid, name='valid_probas')
+    vlabels = tf.boolean_mask(labels, valid, name='valid_labels')
+    return vprobas, vlabels
+
+
 # Tools
 def kl_div(a,b): # q,p
     return tf.nn.softmax(b, axis=1) * (tf.nn.log_softmax(b, axis=1) - tf.nn.log_softmax(a, axis=1))   
@@ -81,14 +178,14 @@ class TFABL(tf.keras.losses.Loss):
 
 # Active Boundary Loss
 class ABL(tf.keras.losses.Loss):
-    def __init__(self, isdetach=True, max_N_ratio = 1/100, ignore_label = 0, label_smoothing=0.2, weight = None, max_clip_dist = 20.):
+    def __init__(self, isdetach=True, max_N_ratio = 1/100, ignore_label = 255, label_smoothing=0, weight = None, max_clip_dist = 20.):
         super(ABL, self).__init__()
         self.ignore_label = ignore_label
         self.label_smoothing = label_smoothing
         self.isdetach=isdetach
         self.max_N_ratio = max_N_ratio
 
-        self.weight_func = lambda w, max_distance=max_clip_dist: tf.clip_by_value(w, clip_value_min=-100, clip_value_max=max_distance) / max_distance
+        self.weight_func = lambda w, max_distance=max_clip_dist: tf.clip_by_value(w, clip_value_min=-1000000, clip_value_max=max_distance) / max_distance
 
         """
         self.dist_map_transform = transforms.Compose([
@@ -103,14 +200,13 @@ class ABL(tf.keras.losses.Loss):
         """
 
         if label_smoothing == 0:
-            self.criterion = tf.keras.losses.CategoricalCrossentropy(
-                reduction=tf.keras.losses.Reduction.NONE
+            self.criterion = tf.keras.losses.SparseCategoricalCrossentropy(
+                from_logits=True,
+                reduction=tf.keras.losses.Reduction.NONE,
+
             )
         else:
-            self.criterion = tf.keras.losses.CategoricalCrossentropy(
-                reduction=tf.keras.losses.Reduction.NONE,
-                label_smoothing=label_smoothing
-            )
+            self.criterion = lovasz_softmax
             #self.criterion = LSSCE(
             #    reduction='none',
             #    lb_smooth = label_smoothing
@@ -133,8 +229,7 @@ class ABL(tf.keras.losses.Loss):
                 eps *=1.2
             else:
                 break
-        #dilate
-        #dilate_weight = tf.ones((1,1,3,3)).cuda()
+        # dilate
         dilate_weight = tf.ones((3,3,1,1))
         kl_combine_bin = tf.transpose(kl_combine_bin, perm=[0, 2, 3, 1])
         edge2 = tf.nn.conv2d(kl_combine_bin, dilate_weight, strides=1, data_format="NHWC", padding="SAME")
@@ -166,11 +261,7 @@ class ABL(tf.keras.losses.Loss):
         return gt_combine > 0
 
     def get_direction_gt_predkl(self, pred_dist_map, pred_bound, logits):
-        # NHW,NHW,NCHW
-        eps = 1e-5
-        # bound = torch.where(pred_bound)  # 3k
-        #bound = torch.nonzero(pred_bound*1) # TODO: FIX
-        
+
         zero = tf.constant(0, dtype=tf.int16)
         where = tf.not_equal(pred_bound*1, zero)
         bound = tf.where(where)
@@ -182,7 +273,6 @@ class ABL(tf.keras.losses.Loss):
 
         pred_dist_map_d = tf.pad(pred_dist_map,[[0,0],[1,1],[1,1]],mode='CONSTANT', constant_values=max_dis) # NH+2W+2
 
-        #logits_d = tf.pad(logits,[[0,0],[1,1],[1,1],[0,0]],mode='CONSTANT') # N(H+2)(W+2)C
         logits_d = logits
         logits_d = tf.concat([logits_d, tf.expand_dims(logits_d[:,1,:,:], axis=1)], axis=1) # N(H+2)(W+2)C
         logits_d = tf.concat([tf.expand_dims(logits_d[:,-1,:,:], axis=1), logits_d], axis=1) # N(H+2)(W+2)C
@@ -216,21 +306,16 @@ class ABL(tf.keras.losses.Loss):
 
             if dx != 0 or dy != 0:
 
-                #logits_now = logits_d[(n,x+dx+1,y+dy+1)]
                 logits_now = tf.gather_nd(indices=indice_pairs, params=logits_d)
-                # kl_map_now = torch.kl_div((kl_center+eps).log(), logits_now+eps).sum(2)  # 8KC->8K
-                #if self.isdetach:
-                #    logits_now = logits_now.detach()
                 kl_map_now = kl_div(kl_center, logits_now)
                 
                 kl_map_now = tf.math.reduce_sum(kl_map_now, axis=1)  # KC->K
+
                 kl_maps = tf.concat((kl_maps, tf.expand_dims(kl_map_now, axis=0)), 0)
                 tf.clip_by_value(kl_maps, clip_value_min=0.0, clip_value_max=20.0)
 
         # direction_gt shound be Nk  (8k->K)
         direction_gt = tf.math.argmin(dist_maps, axis=0)
-        # weight_ce = pred_dist_map[bound]
-        #weight_ce = pred_dist_map[(n,x,y)]
         weight_ce = tf.gather_nd(indices=center_indice_pairs, params=pred_dist_map)
 
         # delete if min is 8 (local position)
@@ -242,7 +327,6 @@ class ABL(tf.keras.losses.Loss):
         return direction_gt, direction_pred, weight_ce
 
     def get_dist_maps(self, target):
-        #target_detach = target.clone().detach()
         target_detach = target
         dist_maps = tf.concat([dist_map_transform(target_detach[i]) for i in range(target_detach.shape[0])], axis=0)
         out = -dist_maps
@@ -251,48 +335,40 @@ class ABL(tf.keras.losses.Loss):
         return out
 
     def call(self, target, logits):
-        eps = 1e-10
-        #ph, pw = logits.size(2), logits.size(3)
-        #h, w = target.size(1), target.size(2)
-
-        # Predicted height will be same as height
-        #if ph != h or pw != w:
-        #    logits = F.interpolate(input=logits, size=(
-        #        h, w), mode='bilinear', align_corners=True)
-
         logits = tf.transpose(logits, perm=[0, 3, 1, 2])
         
-        if len(target.shape) == 4:
-            target = tf.math.argmax(target, axis=-1)
-
         gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
 
-        #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
         dist_maps = self.get_dist_maps(gt_boundary)
-        
+
         pred_boundary = tf.cast(self.logits2boundary(logits), dtype=tf.int16)
         if tf.math.reduce_sum(pred_boundary) < 1: # avoid nan
             return None # you should check in the outside. if None, skip this loss.
-        
-        direction_gt, direction_pred, weight_ce = self.get_direction_gt_predkl(dist_maps, pred_boundary, logits) # NHW,NHW,NCHW
-        direction_gt = tf.one_hot(direction_gt, 8)
 
-        # direction_gt [K, 8], direction_pred [K, 8]
+        direction_gt, direction_pred, weight_ce = self.get_direction_gt_predkl(dist_maps, pred_boundary, logits) # NHW,NHW,NCHW
+
         loss = self.criterion(direction_gt, direction_pred) # careful
 
         weight_ce = self.weight_func(weight_ce)
+
         loss = tf.math.reduce_mean(loss * weight_ce)  # add distance weight
 
         return loss
 
 
 if __name__ == '__main__':
-    n,h,w,c = 1,512,512,2
+    n,h,w,c = 1,100,100,2
     gt = np.zeros((n,h,w))
-    gt[0,5] = 1
-    gt[0,50] = 1
-    gt = tf.convert_to_tensor(gt)
-    logits = tf.random.normal((n,h,w,c))
+    gt[0,5:10] = 1
+    gt[0,50:60] = 1
+    gt = tf.convert_to_tensor(gt, dtype=tf.float32)
+    logits = np.zeros((n, h, w, c))
+    logits[0, 5:30, 20, 0] = 3.41
+    logits[0, 5:30, 20, 1] = 51.2
+    logits[0, 55, 30, 0] = 54.2
+    logits[0, 55, 30, 1] = 0.43
+    logits = tf.convert_to_tensor(logits, dtype=tf.float32)
+
 
     #f, x = plt.subplots(1, 2)
     #x[0].imshow(gt[0])
@@ -301,5 +377,5 @@ if __name__ == '__main__':
     #plt.show()
 
 
-    abl = ABL(label_smoothing=0.2)
+    abl = ABL(label_smoothing=0)
     print(abl(gt, logits))
