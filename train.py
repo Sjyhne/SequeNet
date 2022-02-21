@@ -58,7 +58,7 @@ def train(args, train_ds, val_ds):
     learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(
         args.init_lr,
         args.epochs * len(train_ds),
-        0.00005,
+        args.end_lr,
         power=0.5)
     
     if os.path.exists(os.path.join("model_output", args.model_type)):
@@ -216,6 +216,7 @@ if __name__ == "__main__":
     parser.add_argument("--extra_loss", type=str, default="cce", help="The loss function to be used for the extra segmentation network")
     parser.add_argument("--main_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
     parser.add_argument("--extra_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the extra network")
+    parser.add_argument("--end_lr", type=float, default=1e-5, help="Finishing value of the learning rate when the training is finished")
 
     args = parser.parse_args()
 
