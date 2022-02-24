@@ -4,6 +4,9 @@ from . import segnet
 from . import fcn
 from . import deeplab
 from . import ocrnet
+from . import aspocrnet
+from . import hrnet
+
 model_from_name = {}
 
 
@@ -16,7 +19,7 @@ model_from_name["fcn_32_resnet50"] = fcn.fcn_32_resnet50
 model_from_name["fcn_8_mobilenet"] = fcn.fcn_8_mobilenet
 model_from_name["fcn_32_mobilenet"] = fcn.fcn_32_mobilenet
 
-model_from_name["deeplab"] = deeplab.DeeplabV3Plus
+model_from_name["deeplab"] = deeplab.deeplab
 
 model_from_name["pspnet"] = pspnet.pspnet
 model_from_name["vgg_pspnet"] = pspnet.vgg_pspnet
@@ -27,6 +30,9 @@ model_from_name["pspnet_101"] = pspnet.pspnet_101
 
 model_from_name["hrnetocr"] = ocrnet.hrnetocr
 
+model_from_name["aspocrnet"] = aspocrnet.aspocrnet
+
+model_from_name["hrnet"] = hrnet.hrnet
 
 # model_from_name["mobilenet_pspnet"] = pspnet.mobilenet_pspnet
 

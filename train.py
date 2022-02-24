@@ -1,5 +1,8 @@
 # train.py
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
 from models.metrics import mean_iou
 from generator import create_dataset_generator, create_cityscapes_generator
 from train_utils import calc_biou, remove_all_folders_in_path, store_images
@@ -10,14 +13,15 @@ from models.models.all_models import model_from_name
 
 from train_utils import get_loss_func
 
+
 import tensorflow as tf
+tf.debugging.experimental.disable_dump_debug_info()
 from tqdm import tqdm
 import numpy as np
 
 import argparse
 import json
 import shutil
-import os
 import time
 
 NUM_CLASSES = 2
@@ -27,7 +31,7 @@ def train_step(m, x, y, loss_func, optimizer):
         logits = m(x, training=True)
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
         loss_val = loss_func(y, logits)
-
+    
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
     grads = tape.gradient(loss_val, m.trainable_variables)
@@ -61,12 +65,12 @@ def train(args, train_ds, val_ds):
         args.end_lr,
         power=0.5)
     
-    if os.path.exists(os.path.join("model_output", args.model_type)):
-        shutil.rmtree(os.path.join("model_output", args.model_type))
+    if os.path.exists(os.path.join("model_output", "main_" + args.model_type)):
+        shutil.rmtree(os.path.join("model_output", "main_" + args.model_type))
         
-    os.mkdir(os.path.join("model_output", args.model_type))
+    os.mkdir(os.path.join("model_output", "main_" + args.model_type))
     
-    with open(os.path.join("model_output", args.model_type, "args.json"), 'w') as f:
+    with open(os.path.join("model_output", "main_" + args.model_type, "args.json"), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
@@ -100,8 +104,6 @@ def train(args, train_ds, val_ds):
         remove_all_folders_in_path(f"model_output/main_{args.model_type}/output_images/val/")
 
     epochs = args.epochs
-    
-    main_model_pretraining = 20
     
     best_loss_value = 100_000
     extra_best_loss_value = 100_000
@@ -156,10 +158,9 @@ def train(args, train_ds, val_ds):
                 if step == len(val_ds) - 1:
                     store_images(f"model_output/main_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
         
-        
-        print("Current time taken since start:", round(time.time() - start, 3), "seconds")
-        print("Estimated total time:", ((time.time() - start)/(epoch + 1)) * epochs, "seconds")
-        #print("Current lr:", round(learning_rate_fn((epoch * len(train_ds)) + len(train_ds)).numpy(), 7))
+        time_taken = round(time.time() - start, 3)
+        print("Current time taken since start:", time_taken, "seconds or", round(time_taken/60, 3), "minutes or", round(time_taken/(60*60), 3), "hours")
+        print("Estimated total time:", round(time_taken/(epoch + 1), 3) * epochs, "seconds or", round(time_taken/((epoch + 1) * 60), 3) * epochs, "minutes or", round(time_taken/((epoch + 1) * 60 * 60), 3) * epochs, "hours")
         
         display_and_store_metrics(
             train_loss_metric, val_loss_metric,

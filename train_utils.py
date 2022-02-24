@@ -9,7 +9,7 @@ import os
 import shutil
 import csv
 
-from models.losses import ABL
+from models.losses import ABL, SparseCategoricalFocalLoss
 
 from models.metrics import boundary_iou
 
@@ -27,6 +27,8 @@ def get_loss_func(loss, label_smoothing=0.0):
         return tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=label_smoothing)
     elif loss == "scce":
         return tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    elif loss == "fl":
+        return SparseCategoricalFocalLoss(gamma=2, from_logits=True)
     #elif loss == "tfabl":
     #    return surface_loss_keras
     else:

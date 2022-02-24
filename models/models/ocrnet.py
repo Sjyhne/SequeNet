@@ -7,7 +7,7 @@ from ._custom_layers_and_blocks import ConvolutionBnActivation, BottleneckBlock,
 # High Resolution Network + Object-Contextual Representations
 ################################################################################
 class HRNetOCR(tf.keras.Model):
-    def __init__(self, n_classes, filters=64, height=None, width=None, final_activation="softmax",
+    def __init__(self, n_classes, filters=16, height=None, width=None, final_activation="softmax",
                  spatial_ocr_scale=1, spatial_context_scale=1, **kwargs):
         super(HRNetOCR, self).__init__(**kwargs)
 
@@ -146,7 +146,7 @@ class HRNetOCR(tf.keras.Model):
         return tf.keras.Model(inputs=[x], outputs=self.call(x))
 
 
-def hrnetocr(n_classes, input_height=None, input_width=None, filters=32, final_activation="softmax",
+def hrnetocr(n_classes, input_height=None, input_width=None, filters=8, final_activation="softmax",
                  spatial_ocr_scale=1, spatial_context_scale=1, **kwargs):
     hrnet = HRNetOCR(n_classes, filters, input_height, input_width, final_activation, spatial_ocr_scale, spatial_context_scale)
     

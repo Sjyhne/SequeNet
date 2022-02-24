@@ -28,7 +28,7 @@ def train_step(m, x, y, loss_func, cce_loss, optimizer, dist_map, args):
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
         loss_val = cce_loss(y, logits)
         if args.loss == "abl":
-            abl_val = abl_func(y, logits, dist_map)
+            abl_val = loss_func(y, logits, dist_map)
             loss_val = loss_val + abl_val
 
     # Use the gradient tape to automatically retrieve
@@ -48,13 +48,14 @@ def compute_metrics(softmaxed_logits, anns):
     
     return miou, biou
 
-def evaluate_step(m, x, y, loss_func, dist_map, args):
+def evaluate_step(m, x, y, loss_func, cce_loss, dist_map, args):
     logits = m(x, training=False)
     softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-    if args.loss == "tfabl":
-        loss_val = loss_func(y, logits, dist_map)
-    else:
-        loss_val = loss_func(y, logits)
+    loss_val = cce_loss(y, logits)
+    if args.loss == "abl":
+        abl_val = loss_func(y, logits, dist_map)
+        loss_val = loss_val + abl_val
+        
     return loss_val, softmaxed_logits, logits
 
 def train(args, train_ds, val_ds):
@@ -78,6 +79,7 @@ def train(args, train_ds, val_ds):
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
     main_optimizer = tf.keras.optimizers.Adam(learning_rate=args.init_lr)
     main_loss_fn = get_loss_func(args.loss, args.label_smooth)
+    cce_loss = get_loss_func("cce", 0.0)
     main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
         
     # Prepare the metrics.
@@ -106,7 +108,7 @@ def train(args, train_ds, val_ds):
         print()
         
         for step, (imgs, anns, names, dist_map) in tqdm(enumerate(train_ds), total=len(train_ds)):
-            loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer, dist_map, args)
+            loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, cce_loss, main_optimizer, dist_map, args)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             
             train_loss_metric.append(loss)
@@ -116,7 +118,7 @@ def train(args, train_ds, val_ds):
                 store_images(f"model_output/extra_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
         
         for step, (imgs, anns, names, dist_map) in enumerate(val_ds):
-            loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn, dist_map, args)
+            loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn, cce_loss, dist_map, args)
             miou, biou = compute_metrics(softmaxed_logits, anns)
 
             val_loss_metric.append(loss)
@@ -174,9 +176,9 @@ if __name__ == "__main__":
     # load main model here and perform dataset generation
     
     if args.dataset == "lba":
-        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=True)
-        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=True)
-        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=True)
+        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
+        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
+        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage, create_dist=False)
     elif args.dataset == "cityscapes":
         train_ds = create_cityscapes_generator("train")
         val_ds = create_cityscapes_generator("val")
