@@ -12,6 +12,7 @@ from .hrnet_layers import (
     TransitionLayer3
 )
 
+from ._custom_layers_and_blocks import ConvolutionBnActivation, SpatialGather_Module, SpatialOCR_Module
 
 class HRNet(tf.keras.models.Model):
 
@@ -40,6 +41,22 @@ class HRNet(tf.keras.models.Model):
         self.Branch3_1 = Branch(64)
         self.Branch3_2 = Branch(128)
         self.Branch3_3 = Branch(256)
+        
+        self.AuxHead = tf.keras.Sequential([
+            ConvolutionBnActivation(720, (1, 1)),
+            tf.keras.layers.Conv2D(filters=classes, kernel_size=(1, 1), use_bias=True),
+            tf.keras.layers.Activation("softmax")
+            ])
+        
+        self.Conv3x3BnReluOcr = ConvolutionBnActivation(512, (3, 3))
+        
+        self.SpatialContext = SpatialGather_Module(scale=1)
+        self.SpatialOcr = SpatialOCR_Module(512, scale=1, dropout=0.05)
+        
+        self.FinalConv3x3 = tf.keras.layers.Conv2D(filters=classes, kernel_size=(1, 1), use_bias=True)
+        
+        self.UpSampleX2 = tf.keras.layers.UpSampling2D(size=2, interpolation="bilinear")
+        
 
     def call(self, x):
         
@@ -65,27 +82,21 @@ class HRNet(tf.keras.models.Model):
         x3 = self.Branch3_3(x[3])
 
         x = self.FuseLayer3([x0, x1, x2, x3])
-
-        out = self.FinalLayer(x)
-
+        aux = self.AuxHead(x)
+        
+        x = self.Conv3x3BnReluOcr(x)
+        
+        context = self.SpatialContext(x, aux)
+        x = self.SpatialOcr(x, context)
+        
+        x = self.UpSampleX2(x)
+        out = self.FinalConv3x3(x)
+        
         return out
     
 def hrnet(n_classes, input_height=None, input_width=None):
-    model = HRNet(classes=n_classes, height=input_height, width=input_width)
+    model = HRNet()
     
     #print(model.summary())
     
-    return model
-
-def deeplab(n_classes, input_height=None, input_width=None, filters=256, final_activation="softmax", **kwargs):
-    model = DeepLabV3plus(n_classes, input_height, input_width, "resnet152v2", filters)
-    
-    model = model.build()
-    
-    print(input_height, input_width)
-
-    model = model.model()
-
-    print(model.summary())
-
     return model

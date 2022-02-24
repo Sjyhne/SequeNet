@@ -80,7 +80,10 @@ class ImageDataset:
             imgs[i] = img
             labs[i] = lab
             names.append(image_paths[i].split("/")[-1].split(".")[0])
-            dist_maps[i] = np.load(os.path.join("data/large_building_area/ann_dir", "/".join(label_paths[i].split("/")[-2:]).split(".")[0] + ".npz.npy"))
+            try:
+                dist_maps[i] = np.load(os.path.join("data/large_building_area/ann_dir", "/".join(label_paths[i].split("/")[-2:]).split(".")[0] + ".npz.npy"))
+            except Exception as e:
+                pass
         tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.int64)
         tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
         

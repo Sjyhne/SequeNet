@@ -651,3 +651,62 @@ class SparseCategoricalFocalLoss(tf.keras.losses.Loss):
                                              class_weight=self.class_weight,
                                              gamma=self.gamma,
                                              from_logits=self.from_logits)
+#Keras
+ALPHA = 1.0
+BETA = 2.0
+GAMMA = 1.0
+
+
+class FocalTverskyLoss(tf.keras.losses.Loss):
+    
+    def __init__(self):
+        super().__init__()
+        self.alpha = ALPHA
+        self.beta = BETA
+        self.gamma = GAMMA
+    
+    def call(self, targets, inputs, smooth=1e-6):
+        targets = tf.argmax(targets, axis=-1)
+        inputs = tf.argmax(tf.nn.softmax(inputs, axis=-1), axis=-1)
+
+        #flatten label and prediction tensors
+        inputs = tf.reshape(inputs, [-1])
+        targets = tf.reshape(targets, [-1])
+
+        #True Positives, False Positives & False Negatives
+        TP = tf.cast(tf.reduce_sum((inputs * targets)), dtype=tf.float32)
+        FP = tf.cast(tf.reduce_sum(((1 - targets) * inputs)), dtype=tf.float32)
+        FN = tf.cast(tf.reduce_sum((targets * (1 - inputs))), dtype=tf.float32)
+
+        print(TP)
+        print(FP)
+        print(FN)
+
+        Tversky = (TP + smooth) / (TP + self.alpha * FP + self.beta * FN + smooth)  
+        FocalTversky = tf.pow((1 - Tversky), self.gamma)
+
+        return FocalTversky
+
+"""def FocalTverskyLoss(targets, inputs, alpha=ALPHA, beta=BETA, gamma=GAMMA, smooth=1e-6):
+    
+    targets = tf.argmax(targets, axis=-1)
+    inputs = tf.argmax(tf.nn.softmax(inputs, axis=-1), axis=-1)
+    
+    #flatten label and prediction tensors
+    inputs = tf.reshape(inputs, [-1])
+    targets = tf.reshape(targets, [-1])
+
+    #True Positives, False Positives & False Negatives
+    TP = tf.cast(tf.reduce_sum((inputs * targets)), dtype=tf.float32)
+    FP = tf.cast(tf.reduce_sum(((1-targets) * inputs)), dtype=tf.float32)
+    FN = tf.cast(tf.reduce_sum((targets * (1-inputs))), dtype=tf.float32)
+    
+    print(TP)
+    print(FP)
+    print(FN)
+
+    Tversky = (TP + smooth) / (TP + alpha*FP + beta*FN + smooth)  
+    FocalTversky = tf.pow((1 - Tversky), gamma)
+
+    return FocalTversky
+"""

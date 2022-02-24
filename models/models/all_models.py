@@ -36,13 +36,7 @@ model_from_name["hrnet"] = hrnet.hrnet
 
 # model_from_name["mobilenet_pspnet"] = pspnet.mobilenet_pspnet
 
-
-model_from_name["unet_mini"] = unet.unet_mini
 model_from_name["unet"] = unet.unet
-model_from_name["vgg_unet"] = unet.vgg_unet
-model_from_name["resnet50_unet"] = unet.resnet50_unet
-model_from_name["mobilenet_unet"] = unet.mobilenet_unet
-
 
 model_from_name["segnet"] = segnet.segnet
 model_from_name["vgg_segnet"] = segnet.vgg_segnet
