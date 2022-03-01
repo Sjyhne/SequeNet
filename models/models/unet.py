@@ -7,8 +7,8 @@ from .tf_backbones import create_base_model
 # UNet
 ################################################################################
 class UNet(tf.keras.Model):
-    def __init__(self, n_classes, height=None, width=None, base_model="efficientnetb0", filters=128,
-                 final_activation="softmax", backbone_trainable=False,
+    def __init__(self, n_classes, height=None, width=None, base_model="xception", filters=128,
+                 final_activation="softmax", backbone_trainable=True,
                  up_filters=[32, 64, 128, 256, 512], include_top_conv=True, **kwargs):
         super(UNet, self).__init__(**kwargs)
 

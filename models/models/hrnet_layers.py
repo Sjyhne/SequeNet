@@ -13,7 +13,6 @@ class BasicBlock(tf.keras.layers.Layer):
                             use_bias=False, kernel_initializer='he_normal')
         self.BatchNorm1 = BatchNormalization(axis=3)
         self.BatchNorm2 = BatchNormalization(axis=3)
-        self.BatchNorm3 = BatchNormalization(axis=3)
         self.Relu = Activation('relu')
 
     
@@ -24,7 +23,7 @@ class BasicBlock(tf.keras.layers.Layer):
 
         x = self.Conv2(x)
         x = self.BatchNorm2(x)
-
+        
         x = add([x, inputs])
 
         return x
@@ -82,17 +81,17 @@ class BottleNeckBlock(tf.keras.layers.Layer):
 
 
 class StemNet(tf.keras.layers.Layer):
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, cnv_flter=32, bttlnck_flter=128):
         super(StemNet, self).__init__()
-        self.Conv1 = Conv2D(64, 3, strides=(2, 2), padding='same', use_bias=False,
+        self.Conv1 = Conv2D(cnv_flter, 3, strides=(2, 2), padding='same', use_bias=False,
                             kernel_initializer='he_normal', input_shape=input_shape)
         self.BatchNorm1 = BatchNormalization(axis=3)
         self.Relu1 = Activation('relu')
 
-        self.BottleNeck1 = BottleNeckBlock(256, with_conv_shortcut=True)
-        self.BottleNeck2 = BottleNeckBlock(256)
-        self.BottleNeck3 = BottleNeckBlock(256)
-        self.BottleNeck4 = BottleNeckBlock(256)
+        self.BottleNeck1 = BottleNeckBlock(bttlnck_flter, with_conv_shortcut=True)
+        self.BottleNeck2 = BottleNeckBlock(bttlnck_flter)
+        self.BottleNeck3 = BottleNeckBlock(bttlnck_flter)
+        self.BottleNeck4 = BottleNeckBlock(bttlnck_flter)
 
     
     def call(self, inputs):
@@ -221,17 +220,17 @@ class TransitionLayer3(tf.keras.layers.Layer):
 
 class FuseLayer1(tf.keras.layers.Layer):
 
-    def __init__(self):
+    def __init__(self, conv_filters=[16, 32]):
         super(FuseLayer1, self).__init__()
-        self.Conv1 = Conv2D(32, 1, use_bias=False,
+        self.Conv1 = Conv2D(conv_filters[0], 1, use_bias=False,
                             kernel_initializer='he_normal')
-        self.Conv2 = Conv2D(64, 3, strides=(2, 2), padding='same',
+        self.Conv2 = Conv2D(conv_filters[1], 3, strides=(2, 2), padding='same',
                             use_bias=False, kernel_initializer='he_normal')
 
         self.BatchNorm1 = BatchNormalization(3)
         self.BatchNorm2 = BatchNormalization(3)
 
-        self.ConvT1 = Conv2DTranspose(32, 3, strides=(
+        self.ConvT1 = Conv2DTranspose(conv_filters[0], 3, strides=(
             2, 2), use_bias=False, kernel_initializer='he_normal', padding='same')
 
     
@@ -254,21 +253,21 @@ class FuseLayer1(tf.keras.layers.Layer):
 
 
 class FuseLayer2(tf.keras.layers.Layer):
-    def __init__(self):
+    def __init__(self, conv_filters=[16, 32, 64]):
         super(FuseLayer2, self).__init__()
-        self.Conv1 = Conv2D(32, 1, use_bias=False,
+        self.Conv1 = Conv2D(conv_filters[0], 1, use_bias=False,
                             kernel_initializer='he_normal', padding='same')
-        self.Conv2 = Conv2D(32, 1, use_bias=False,
+        self.Conv2 = Conv2D(conv_filters[0], 1, use_bias=False,
                             kernel_initializer='he_normal', padding='same')
-        self.Conv3 = Conv2D(64, 3, strides=(2, 2), use_bias=False,
+        self.Conv3 = Conv2D(conv_filters[1], 3, strides=(2, 2), use_bias=False,
                             kernel_initializer='he_normal', padding='same')
-        self.Conv4 = Conv2D(64, 1, use_bias=False,
+        self.Conv4 = Conv2D(conv_filters[1], 1, use_bias=False,
                             kernel_initializer='he_normal', padding='same')
-        self.Conv5 = Conv2D(32, 3, strides=(2, 2), use_bias=False,
+        self.Conv5 = Conv2D(conv_filters[0], 3, strides=(2, 2), use_bias=False,
                             kernel_initializer='he_normal', padding='same')
-        self.Conv6 = Conv2D(128, 3, strides=(
+        self.Conv6 = Conv2D(conv_filters[2], 3, strides=(
             2, 2), use_bias=False, kernel_initializer='he_normal', padding='same')
-        self.Conv7 = Conv2D(128, 3, strides=(
+        self.Conv7 = Conv2D(conv_filters[2], 3, strides=(
             2, 2), use_bias=False, kernel_initializer='he_normal', padding='same')
 
         self.BatchNorm1 = BatchNormalization(3)
@@ -329,24 +328,24 @@ class FuseLayer2(tf.keras.layers.Layer):
 
 class FuseLayer3(tf.keras.layers.Layer):
 
-    def __init__(self):
+    def __init__(self, conv_filters=[32]):
         super(FuseLayer3, self).__init__()
-        self.Conv1 = Conv2D(32, 1, use_bias=False,
+        self.Conv1 = Conv2D(conv_filters[0], 1, use_bias=False,
                             kernel_initializer='he_normal')
-        self.Conv2 = Conv2D(32, 1, use_bias=False,
+        self.Conv2 = Conv2D(conv_filters[0], 1, use_bias=False,
                             kernel_initializer='he_normal')
-        self.Conv3 = Conv2D(32, 1, use_bias=False,
+        self.Conv3 = Conv2D(conv_filters[0], 1, use_bias=False,
                             kernel_initializer='he_normal')
 
         self.BatchNorm1 = BatchNormalization(3)
         self.BatchNorm2 = BatchNormalization(3)
         self.BatchNorm3 = BatchNormalization(3)
 
-        self.ConvT1 = Conv2DTranspose(32, 3, strides=(
+        self.ConvT1 = Conv2DTranspose(conv_filters[0], 3, strides=(
             2, 2), use_bias=False, kernel_initializer='he_normal', padding='same')
-        self.ConvT2 = Conv2DTranspose(32, 3, strides=(
+        self.ConvT2 = Conv2DTranspose(conv_filters[0], 3, strides=(
             4, 4), use_bias=False, kernel_initializer='he_normal', padding='same')
-        self.ConvT3 = Conv2DTranspose(32, 3, strides=(
+        self.ConvT3 = Conv2DTranspose(conv_filters[0], 3, strides=(
             8, 8), use_bias=False, kernel_initializer='he_normal', padding='same')
 
     
@@ -371,9 +370,9 @@ class FuseLayer3(tf.keras.layers.Layer):
 
 
 class FinalLayer(tf.keras.layers.Layer):
-    def __init__(self, classes=1):
+    def __init__(self, classes=2):
         super(FinalLayer, self).__init__()
-        self.ConvT = Conv2DTranspose(16, 2, strides=(
+        self.ConvT = Conv2DTranspose(32, 2, strides=(
             2, 2), use_bias=False, kernel_initializer='he_normal', padding='same')
         self.Conv = Conv2D(classes, 1, use_bias=False,
                            kernel_initializer='he_normal')
@@ -392,7 +391,7 @@ class FinalLayer(tf.keras.layers.Layer):
 
 
 class Branch(tf.keras.layers.Layer):
-    def __init__(self, filters=32):
+    def __init__(self, filters=16):
         super(Branch, self).__init__()
         self.BasicBlock1 = BasicBlock(filters)
         self.BasicBlock2 = BasicBlock(filters)

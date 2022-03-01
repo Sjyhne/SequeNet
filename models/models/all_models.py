@@ -6,6 +6,9 @@ from . import deeplab
 from . import ocrnet
 from . import aspocrnet
 from . import hrnet
+from . import danet
+from . import cfnet
+from . import hrnetocr
 
 model_from_name = {}
 
@@ -33,6 +36,12 @@ model_from_name["hrnetocr"] = ocrnet.hrnetocr
 model_from_name["aspocrnet"] = aspocrnet.aspocrnet
 
 model_from_name["hrnet"] = hrnet.hrnet
+
+model_from_name["hrnetocr"] = hrnetocr.hrnetocr
+
+model_from_name["danet"] = danet.danet
+
+model_from_name["cfnet"] = cfnet.cfnet
 
 # model_from_name["mobilenet_pspnet"] = pspnet.mobilenet_pspnet
 

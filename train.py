@@ -13,6 +13,7 @@ from models.models.all_models import model_from_name
 
 from train_utils import get_loss_func
 
+import cv2
 
 import tensorflow as tf
 tf.debugging.experimental.disable_dump_debug_info()
@@ -26,12 +27,15 @@ import time
 
 NUM_CLASSES = 2
 
-def train_step(m, x, y, loss_func, optimizer):
+def train_step(m, x, y, loss_func, cce_loss, optimizer, dist_map, args):
     with tf.GradientTape()  as tape:
         logits = m(x, training=True)
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-        loss_val = loss_func(y, logits)
-    
+        loss_val = cce_loss(y, logits)
+        if args.main_loss == "abl":
+            abl_val = loss_func(y, logits, dist_map)
+            loss_val = loss_val + abl_val
+
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
     grads = tape.gradient(loss_val, m.trainable_variables)
@@ -49,10 +53,14 @@ def compute_metrics(softmaxed_logits, anns):
     
     return miou, biou
 
-def evaluate_step(m, x, y, loss_func):
+def evaluate_step(m, x, y, loss_func, cce_loss, dist_map, args):
     logits = m(x, training=False)
     softmaxed_logits = tf.nn.softmax(logits, axis=-1)
-    loss_val = loss_func(y, logits)
+    loss_val = cce_loss(y, logits)
+    if args.main_loss == "abl":
+        abl_val = loss_func(y, logits, dist_map)
+        loss_val = loss_val + abl_val
+        
     return loss_val, softmaxed_logits, logits
 
 def train(args, train_ds, val_ds):
@@ -75,8 +83,12 @@ def train(args, train_ds, val_ds):
 
     # Add learning rate scheduler to the optimizer -- Believe that should work -- CosineWarmStart or something
     main_optimizer = tf.keras.optimizers.Adam(learning_rate=args.init_lr)
-    main_loss_fn = get_loss_func(args.main_loss, args.main_label_smooth)
-    main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
+    main_loss_fn = get_loss_func(args.main_loss, args.label_smooth)
+    cce_loss = get_loss_func("cce", 0.0)
+    if args.model_type == "msrf":
+        main_model = model_from_name[args.model_type]((512, 512, 3), (512, 512, 3))
+    else:
+        main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
     
     if args.extra_model == True:
         extra_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
@@ -113,8 +125,8 @@ def train(args, train_ds, val_ds):
     for epoch in range(epochs):
         print(f"Epoch: {epoch}/{epochs}")
         print()
-        for step, (imgs, anns, names, _) in tqdm(enumerate(train_ds), total=len(train_ds)):
-            loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, main_optimizer)
+        for step, (imgs, anns, names, dist_map) in tqdm(enumerate(train_ds), total=len(train_ds)):
+            loss, softmaxed_logits, logits = train_step(main_model, imgs, anns, main_loss_fn, cce_loss, main_optimizer, dist_map, args)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             if args.extra_model == True and epoch >= main_model_pretraining:
                 logits = tf.stop_gradient(softmaxed_logits)
@@ -137,8 +149,8 @@ def train(args, train_ds, val_ds):
                     store_images(f"model_output/main_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
 
         
-        for step, (imgs, anns, names, _) in enumerate(val_ds):
-            loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn)
+        for step, (imgs, anns, names, dist_map) in enumerate(val_ds):
+            loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn, cce_loss, dist_map, args)
             miou, biou = compute_metrics(softmaxed_logits, anns)
             if args.extra_model == True and epoch >= main_model_pretraining:
                 logits = tf.stop_gradient(softmaxed_logits)
@@ -177,9 +189,9 @@ def train(args, train_ds, val_ds):
                 "extra", args
             )
         
-        best_loss_value = save_best_model(main_model, round((sum(val_loss_metric)/len(val_loss_metric)).cpu().numpy(), 3), best_loss_value, epoch, "main", args)
+        best_loss_value = save_best_model(main_model, round((sum(val_loss_metric)/len(val_loss_metric)).cpu().numpy(), 5), best_loss_value, epoch, "main", args)
         if args.extra_model == True and epoch >= main_model_pretraining:
-            extra_best_loss_value = save_best_model(extra_model, round((sum(extra_val_loss_metric)/len(extra_val_loss_metric)).cpu().numpy(), 3), extra_best_loss_value, epoch, "extra", args)
+            extra_best_loss_value = save_best_model(extra_model, round((sum(extra_val_loss_metric)/len(extra_val_loss_metric)).cpu().numpy(), 5), extra_best_loss_value, epoch, "extra", args)
 
         # Reset training metrics at the end of each epoch
         train_loss_metric = []
@@ -218,6 +230,7 @@ if __name__ == "__main__":
     parser.add_argument("--main_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the main network")
     parser.add_argument("--extra_label_smooth", type=float, default=0.0, help="The label smoothing value for the loss function for the extra network")
     parser.add_argument("--end_lr", type=float, default=1e-5, help="Finishing value of the learning rate when the training is finished")
+    parser.add_argument("--label_smooth", type=float, default=0, help="Label-smoothing for the losses, only works with cce and abl(?)")
 
     args = parser.parse_args()
 
