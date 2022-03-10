@@ -33,7 +33,7 @@ def train_step(m, x, y, loss_func, cce_loss, optimizer, dist_map, args):
         softmaxed_logits = tf.nn.softmax(logits, axis=-1)
         loss_val = cce_loss(y, logits)
         if args.main_loss == "abl":
-            abl_val = loss_func(y, logits, dist_map)
+            abl_val = loss_func(y, logits, dist_map) * 0.4
             loss_val = loss_val + abl_val
 
     # Use the gradient tape to automatically retrieve
@@ -58,7 +58,7 @@ def evaluate_step(m, x, y, loss_func, cce_loss, dist_map, args):
     softmaxed_logits = tf.nn.softmax(logits, axis=-1)
     loss_val = cce_loss(y, logits)
     if args.main_loss == "abl":
-        abl_val = loss_func(y, logits, dist_map)
+        abl_val = loss_func(y, logits, dist_map) * 0.4
         loss_val = loss_val + abl_val
         
     return loss_val, softmaxed_logits, logits
@@ -85,10 +85,7 @@ def train(args, train_ds, val_ds):
     main_optimizer = tf.keras.optimizers.Adam(learning_rate=args.init_lr)
     main_loss_fn = get_loss_func(args.main_loss, args.label_smooth)
     cce_loss = get_loss_func("cce", 0.0)
-    if args.model_type == "msrf":
-        main_model = model_from_name[args.model_type]((512, 512, 3), (512, 512, 3))
-    else:
-        main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
+    main_model = model_from_name[args.model_type](args.num_classes, input_height=args.image_dim, input_width=args.image_dim)
     
     if args.extra_model == True:
         extra_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_fn)
@@ -147,7 +144,11 @@ def train(args, train_ds, val_ds):
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(train_ds) - 1:
                     store_images(f"model_output/main_{args.model_type}/output_images/train/{epoch}", anns, imgs, softmaxed_logits, names)
-
+            
+            del imgs
+            del anns
+            del names
+            del dist_map
         
         for step, (imgs, anns, names, dist_map) in enumerate(val_ds):
             loss, softmaxed_logits, logits = evaluate_step(main_model, imgs, anns, main_loss_fn, cce_loss, dist_map, args)
@@ -169,10 +170,16 @@ def train(args, train_ds, val_ds):
             if args.extra_model == False or epoch < main_model_pretraining:
                 if step == len(val_ds) - 1:
                     store_images(f"model_output/main_{args.model_type}/output_images/val/{epoch}", anns, imgs, softmaxed_logits, names)
+            del imgs
+            del anns
+            del names
+            del dist_map
         
         time_taken = round(time.time() - start, 3)
         print("Current time taken since start:", time_taken, "seconds or", round(time_taken/60, 3), "minutes or", round(time_taken/(60*60), 3), "hours")
         print("Estimated total time:", round(time_taken/(epoch + 1), 3) * epochs, "seconds or", round(time_taken/((epoch + 1) * 60), 3) * epochs, "minutes or", round(time_taken/((epoch + 1) * 60 * 60), 3) * epochs, "hours")
+        print("Current Learning Rate:", main_optimizer.learning_rate)
+        
         
         display_and_store_metrics(
             train_loss_metric, val_loss_metric,

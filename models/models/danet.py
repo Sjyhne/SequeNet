@@ -58,7 +58,7 @@ class DANet(tf.keras.Model):
         self.concat_1 = tf.keras.layers.Concatenate(axis=axis)
         self.concat_2 = tf.keras.layers.Concatenate(axis=axis)
         
-        self.final_conv1x1_bn_activation = ConvolutionBnActivation(n_classes, (1, 1), post_activation=final_activation)
+        self.final_conv1x1_bn_activation = ConvolutionBnActivation(n_classes, (1, 1), post_activation=None)
     
     def call(self, inputs, training=None, mask=None):
         if training is None:
@@ -94,7 +94,7 @@ class DANet(tf.keras.Model):
         return tf.keras.Model(inputs=[x], outputs=self.call(x))
 
 
-def danet(n_classes, input_height=None, input_width=None, filters=256, final_activation="softmax", **kwargs):
+def danet(n_classes, input_height=None, input_width=None, filters=128, final_activation="softmax", **kwargs):
     danet = DANet(n_classes, input_height, input_width, "efficientnetb7", filters, final_activation)
     
     print(input_height, input_width)

@@ -153,6 +153,33 @@ def generate_dist_maps(mask_folder):
             #lab = tf.keras.utils.to_categorical(lab, num_classes=2)
             dist_map = calc_abl_dist_map(lab)[0]
             np.save(os.path.join(mask_folder, file.split(".")[0] + ".npz"), dist_map)
+
+def cannify_images(imgs, thresholds):
+    cannified = np.ndarray((imgs.shape[0], imgs.shape[1], imgs.shape[2], 1))
+    imgs = np.uint8(imgs.numpy())
+    
+    for i, img in enumerate(imgs):
+        cannified[i] = np.expand_dims(cv.Canny(img, thresholds[0], thresholds[1]), axis=-1)
+        
+    return cannified
+
+def lsdify_images(imgs, lsd):
+    lines = []
+    imgs = np.uint8(imgs.numpy())
+    for img in imgs:
+        img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        line = lsd.detect(img)[0]
+        lines.append(line)
+    
+    return lines
+
+def dilate_masks(masks, kernel):
+    dilated = np.ndarray((masks.shape))
+    masks = np.uint8(masks.numpy())
+    for i, mask in enumerate(masks):
+        dilated[i] = cv.dilate(mask, np.ones(kernel))
+    
+    return dilated
             
 def create_dataset_from_model(dataset, dataset_type, args):
     base_path = os.path.join("data", args.load_model + "_large_building_area")
@@ -163,9 +190,6 @@ def create_dataset_from_model(dataset, dataset_type, args):
         print("Data already exists, and overwrite is False")
         
         return create_dataset_generator(os.path.join(base_path, "img_dir"), dataset_type, args.batch_size, data_percentage=args.data_percentage)
-    
-    print("Please dont go here")
-    exit()
     
     model_path = os.path.join("model_output", args.load_model)
     for file in os.listdir(model_path):
@@ -179,7 +203,8 @@ def create_dataset_from_model(dataset, dataset_type, args):
         print("Something went wrong loading", model_path, "|", args.load_model)
         print(e)
         exit()
-    # Create folder for data if not exist, delete if already exist
+
+        # Create folder for data if not exist, delete if already exist
     if os.path.exists(os.path.join(base_path, "img_dir", dataset_type)):
         shutil.rmtree(os.path.join(base_path, "img_dir", dataset_type))
         shutil.rmtree(os.path.join(base_path, "ann_dir", dataset_type))
@@ -193,21 +218,34 @@ def create_dataset_from_model(dataset, dataset_type, args):
     os.makedirs(os.path.join(base_path, "mask_dir", dataset_type))
     os.makedirs(os.path.join(base_path, "grad_dir", dataset_type))
     
-    for step, (imgs, anns, names) in tqdm(enumerate(dataset), total=len(dataset)):
+    lsd = cv.createLineSegmentDetector(0, ang_th=40.0)
+    
+    for step, (imgs, anns, names, _) in tqdm(enumerate(dataset), total=len(dataset)):
         preds = model(imgs)
         anns = tf.math.argmax(anns, axis=-1)
-        masks = tf.math.argmax(preds, axis=-1)
-        grads = preds[:, :, :, 1]
-        logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(preds[:, :, :, 1], 0.3, 1.0), axis=-1))/255
+        masks = tf.math.argmax(tf.nn.softmax(preds, axis=-1), axis=-1)
+        grads = np.clip(tf.nn.softmax(preds, axis=-1)[:, :, :, 1].numpy() + 0.5, 0.2, 1.0)
+        #canny = cannify_images(imgs, (120, 200))
+        lines = lsdify_images(imgs, lsd)
+        dilated_masks = np.clip(dilate_masks(masks, (30, 30)), 0.15, 1.0)
+        build_grad = np.expand_dims(grads * dilated_masks, axis=-1)
+        #canny = build_grad * canny
+        imgs = np.uint8(imgs.numpy())
+        new_imgs = np.ndarray(imgs.shape)
+        for i, img in enumerate(imgs):
+            new_imgs[i] = lsd.drawSegments(img, lines[i])
+        logits = np.clip(new_imgs * build_grad, 0, 255)
+        logits = np.uint8(logits)
+        #logits = (tf.cast(imgs, dtype=tf.float32) * tf.expand_dims(tf.clip_by_value(preds[:, :, :, 1], 0.3, 1.0), axis=-1))/255
         for i, logit in enumerate(logits):
-            plt.imsave(os.path.join(base_path, "img_dir", dataset_type, names[i] + ".png"), logit.numpy())
+            plt.imsave(os.path.join(base_path, "img_dir", dataset_type, names[i] + ".png"), logit)
             plt.imsave(os.path.join(base_path, "ann_dir", dataset_type, names[i] + ".png"), anns[i].numpy())
-            plt.imsave(os.path.join(base_path, "mask_dir", dataset_type, names[i] + ".png"), masks[i].numpy())
-            plt.imsave(os.path.join(base_path, "grad_dir", dataset_type, names[i] + ".png"), grads[i].numpy())
-            
-    
+            plt.imsave(os.path.join(base_path, "mask_dir", dataset_type, names[i] + ".png"), dilated_masks[i])
+            plt.imsave(os.path.join(base_path, "grad_dir", dataset_type, names[i] + ".png"), np.squeeze(build_grad)[i])
+        
     return create_dataset_generator(os.path.join(base_path, "img_dir"), dataset_type, args.batch_size, data_percentage=args.data_percentage)
 
+    
 
 def patchify_images(tupl):
 

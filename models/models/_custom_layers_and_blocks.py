@@ -46,7 +46,10 @@ class ConvolutionBnActivation(tf.keras.layers.Layer):
         self.conv = None
         self.bn = None
         #tf.keras.layers.BatchNormalization(scale=False, momentum=0.9)
-        self.post_activation = tf.keras.layers.Activation(post_activation)
+        if post_activation != None:
+            self.post_activation = tf.keras.layers.Activation(post_activation)
+        else:
+            self.post_activation = None
 
     def build(self, input_shape):
         self.conv = tf.keras.layers.Conv2D(
@@ -82,7 +85,8 @@ class ConvolutionBnActivation(tf.keras.layers.Layer):
     def call(self, x, training=None):
         x = self.conv(x)
         x = self.bn(x, training=training)
-        x = self.post_activation(x)
+        if self.post_activation != None:
+            x = self.post_activation(x)
 
         return x
 

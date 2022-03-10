@@ -53,9 +53,9 @@ class CFNet(tf.keras.Model):
         self.acf = AggCF_Module(filters, kq_transform=self.acf_kq_transform, value_transform="conv",
                               pooling=self.acf_pool, concat=self.acf_concat, dropout=0.1)
         
-        self.final_conv3x3_bn_activation = ConvolutionBnActivation(n_classes, (3, 3), post_activation=final_activation)
+        self.final_conv3x3_bn_activation = ConvolutionBnActivation(n_classes, (3, 3), post_activation=None)
         self.final_upsampling2d = tf.keras.layers.UpSampling2D(size=8, interpolation="bilinear")
-
+    
     def call(self, inputs, training=None, mask=None):
         if training is None:
             training = True
@@ -88,7 +88,7 @@ class CFNet(tf.keras.Model):
         return tf.keras.Model(inputs=[x], outputs=self.call(x))
     
 def cfnet(n_classes, input_height=None, input_width=None, filters=256, final_activation="softmax", **kwargs):
-    cfnet = CFNet(n_classes, input_height, input_width, "efficientnetb7", filters, final_activation)
+    cfnet = CFNet(n_classes, input_height, input_width, "efficientnetb0", filters, final_activation)
     
     print(input_height, input_width)
 

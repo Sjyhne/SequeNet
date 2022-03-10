@@ -7,7 +7,7 @@ from .tf_backbones import create_base_model
 # DeepLabV3+
 ################################################################################
 class DeepLabV3plus(tf.keras.Model):
-    def __init__(self, n_classes, height=None, width=None, base_model="efficientnetb7", filters=256,
+    def __init__(self, n_classes, height=None, width=None, base_model="efficientnetb0", filters=256,
                  final_activation="softmax", backbone_trainable=True,
                  output_stride=8, dilations=[6, 12, 18], **kwargs):
         super(DeepLabV3plus, self).__init__(**kwargs)
@@ -54,7 +54,7 @@ class DeepLabV3plus(tf.keras.Model):
         
         self.conv3x3_bn_relu_1 = ConvolutionBnActivation(filters, 3)
         self.conv3x3_bn_relu_2 = ConvolutionBnActivation(filters, 3)
-        self.conv1x1_bn_sigmoid = ConvolutionBnActivation(self.n_classes, 1, post_activation="linear")
+        self.conv1x1_bn_sigmoid = ConvolutionBnActivation(self.n_classes, 1, post_activation=None)
 
 
     def call(self, inputs, training=None, mask=None):
@@ -89,11 +89,14 @@ class DeepLabV3plus(tf.keras.Model):
         return tf.keras.Model(inputs=[x], outputs=self.call(x))
 
 def deeplab(n_classes, input_height=None, input_width=None, filters=256, final_activation="softmax", **kwargs):
-    model = DeepLabV3plus(n_classes, input_height, input_width, "resnet152v2", filters)
+    model = DeepLabV3plus(n_classes, input_height, input_width, "efficientnetb0", filters)
     
     print(input_height, input_width)
+    
 
     model = model.model()
+    
+    model.build((None, 512, 512, 3))
 
     print(model.summary())
 

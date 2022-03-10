@@ -9,6 +9,7 @@ from . import hrnet
 from . import danet
 from . import cfnet
 from . import hrnetocr
+from . import swin
 
 model_from_name = {}
 
@@ -42,6 +43,8 @@ model_from_name["hrnetocr"] = hrnetocr.hrnetocr
 model_from_name["danet"] = danet.danet
 
 model_from_name["cfnet"] = cfnet.cfnet
+
+model_from_name["swin"] = swin.swin
 
 # model_from_name["mobilenet_pspnet"] = pspnet.mobilenet_pspnet
 

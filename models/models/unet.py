@@ -7,9 +7,9 @@ from .tf_backbones import create_base_model
 # UNet
 ################################################################################
 class UNet(tf.keras.Model):
-    def __init__(self, n_classes, height=None, width=None, base_model="xception", filters=128,
+    def __init__(self, n_classes, height=None, width=None, base_model="resnet50v2", filters=128,
                  final_activation="softmax", backbone_trainable=True,
-                 up_filters=[32, 64, 128, 256, 512], include_top_conv=True, **kwargs):
+                 up_filters=[16, 32, 64, 128, 256], include_top_conv=True, **kwargs):
         super(UNet, self).__init__(**kwargs)
 
         self.n_classes = n_classes
@@ -39,7 +39,7 @@ class UNet(tf.keras.Model):
 
         self.final_conv3x3 = tf.keras.layers.Conv2D(self.n_classes, (3, 3), strides=(1, 1), padding='same')
 
-        self.final_activation = tf.keras.layers.Activation(final_activation)
+        #self.final_activation = tf.keras.layers.Activation(final_activation)
 
     def call(self, inputs, training=None, mask=None):
         if training is None:
@@ -72,6 +72,8 @@ class UNet(tf.keras.Model):
 def unet(n_classes, input_height=None, input_width=None):
     model = UNet(n_classes, input_height, input_width)
     
-    #print(model.summary())
+    model.build((None, 512, 512, 3))
+    
+    print(model.summary())
     
     return model

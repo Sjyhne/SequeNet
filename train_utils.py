@@ -9,7 +9,7 @@ import os
 import shutil
 import csv
 
-from models.losses import ABL, SparseCategoricalFocalLoss, FocalTverskyLoss
+from models.losses import ABL, SparseCategoricalFocalLoss, FocalTverskyLoss, segmentation_boundary_loss
 
 from models.metrics import boundary_iou
 
@@ -31,6 +31,8 @@ def get_loss_func(loss, label_smoothing=0.0):
         return SparseCategoricalFocalLoss(gamma=2, from_logits=True)
     elif loss == "ftl":
         return FocalTverskyLoss()
+    elif loss == "sbl":
+        return segmentation_boundary_loss
     #elif loss == "tfabl":
     #    return surface_loss_keras
     else:

@@ -34,6 +34,8 @@ def lovasz_softmax(labels, probas, classes='present', per_image=False, ignore=No
       ignore: void class labels
       order: use BHWC or BCHW
     """
+    labels = tf.argmax(labels, axis=-1)
+    probas = tf.transpose(probas, perm=[0, 3, 1, 2])
     if per_image:
         def treat_image(prob_lab):
             prob, lab = prob_lab
@@ -70,8 +72,10 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
             class_pred = probas[:, c]
         errors = tf.abs(fg - class_pred)
         errors_sorted, perm = tf.nn.top_k(errors, k=tf.shape(errors)[0], name="descending_sort_{}".format(c))
+        del errors
         fg_sorted = tf.gather(fg, perm)
         grad = lovasz_grad(fg_sorted)
+        del fg_sorted
         losses.append(
             tf.tensordot(errors_sorted, tf.stop_gradient(grad), 1, name="loss_class_{}".format(c))
                       )
@@ -82,8 +86,8 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
         present = tf.stack(present)
         losses_tensor = tf.boolean_mask(losses_tensor, present)
     loss = tf.reduce_mean(losses_tensor)
+    del losses_tensor
     return loss
-
 
 def flatten_probas(probas, labels, ignore=None, order='BHWC'):
     """
@@ -202,14 +206,7 @@ class ABL():
             self.criterion = tf.keras.losses.SparseCategoricalCrossentropy(
                 from_logits=True,
                 reduction=tf.keras.losses.Reduction.NONE,
-
             )
-        else:
-            self.criterion = lovasz_softmax
-            #self.criterion = LSSCE(
-            #    reduction='none',
-            #    lb_smooth = label_smoothing
-            #)
 
     def logits2boundary(self, logit):
         eps = 1e-5
@@ -326,6 +323,23 @@ class ABL():
         kl_maps = tf.transpose(kl_maps, perm=[1, 0])
         direction_pred = kl_maps[direction_gt_idx]
         weight_ce = weight_ce[direction_gt_idx]
+        
+        del kl_maps
+        del direction_gt_idx
+        del kl_center
+        del center_indice_pairs
+        del dist_maps
+        del x_range
+        del y_range
+        del logits_d
+        del pred_dist_map_d
+        del x
+        del n
+        del y
+        del zero
+        del where
+        del bound
+        
         return direction_gt, direction_pred, weight_ce
 
     def get_dist_maps(self, target):
@@ -333,6 +347,7 @@ class ABL():
         dist_maps = tf.concat([dist_map_transform(target_detach[i]) for i in range(target_detach.shape[0])], axis=0)
         out = -dist_maps
         out = tf.where(out>0, out, tf.zeros_like(out))
+
         
         return out
 
@@ -356,8 +371,14 @@ class ABL():
         loss = self.criterion(direction_gt, direction_pred) # careful
 
         weight_ce = tf.cast(self.weight_func(weight_ce), dtype=tf.float32)
+        
+        del pred_boundary
+        del direction_gt
+        del direction_pred
 
         loss = tf.math.reduce_mean(loss * weight_ce)  # add distance weight
+        
+        del weight_ce
 
         return loss
 
@@ -710,3 +731,55 @@ class FocalTverskyLoss(tf.keras.losses.Loss):
 
     return FocalTversky
 """
+
+#Shape of semantic segmentation mask
+OUTPUT_SHAPE = (512, 512, 3)
+
+def segmentation_boundary_loss(y_true, y_pred):
+    """
+    Paper Implemented : https://arxiv.org/abs/1905.07852
+    Using Binary Segmentation mask, generates boundary mask on fly and claculates boundary loss.
+    :param y_true:
+    :param y_pred:
+    :return:
+    """
+    
+    y_true = tf.cast(y_true, dtype=tf.float32)
+    y_pred = tf.cast(y_pred, dtype=tf.float32)
+    
+    y_pred_bd = tf.keras.layers.MaxPooling2D((3, 3), strides=(1, 1), padding='same', input_shape=OUTPUT_SHAPE)(1 - y_pred)
+    y_true_bd = tf.keras.layers.MaxPooling2D((3, 3), strides=(1, 1), padding='same', input_shape=OUTPUT_SHAPE)(1 - y_true)
+    y_pred_bd = y_pred_bd - (1 - y_pred)
+    y_true_bd = y_true_bd - (1 - y_true)
+
+    y_pred_bd_ext = tf.keras.layers.MaxPooling2D((5, 5), strides=(1, 1), padding='same', input_shape=OUTPUT_SHAPE)(1 - y_pred)
+    y_true_bd_ext = tf.keras.layers.MaxPooling2D((5, 5), strides=(1, 1), padding='same', input_shape=OUTPUT_SHAPE)(1 - y_true)
+    y_pred_bd_ext = y_pred_bd_ext - (1 - y_pred)
+    y_true_bd_ext = y_true_bd_ext - (1 - y_true)
+
+    P = tf.reduce_sum(y_pred_bd * y_true_bd_ext) / tf.reduce_sum(y_pred_bd) + 1e-7
+    R = tf.reduce_sum(y_true_bd * y_pred_bd_ext) / tf.reduce_sum(y_true_bd) + 1e-7
+    F1_Score = 2 * P * R / (P + R + 1e-7)
+    # print(f'Precission: {P.eval()}, Recall: {R.eval()}, F1: {F1_Score.eval()}')
+    loss = tf.reduce_mean(1 - F1_Score)
+    # print(f"Loss:{loss.eval()}")
+    return loss
+
+def jaccard_pow_loss(y_true, y_pred, p_value=2, smooth = 10):
+        
+    
+    if len(y_true.shape) == 4:
+        y_true = tf.argmax(y_true, axis=-1)
+    if len(y_pred.shape) == 4:
+        y_pred = tf.argmax(tf.nn.softmax(y_pred, axis=-1), axis=-1)
+    
+    p_value = p_value
+    y_true_f = tf.reshape(y_true, [-1])
+    y_pred_f = tf.reshape(y_pred, [-1])
+
+    intersection = tf.reduce_sum(y_true_f * y_pred_f)
+    term_true = tf.reduce_sum(tf.pow(y_true_f, p_value))
+    term_pred = tf.reduce_sum(tf.pow(y_pred_f, p_value))
+    union = term_true + term_pred - intersection
+    
+    return tf.cast(1 - ((intersection + smooth) / (union + smooth)), dtype=tf.float32)

@@ -38,7 +38,7 @@ class ASPOCRNet(tf.keras.Model):
 
         self.asp_ocr = SpatialOCR_ASP_Module(filters, scale=spatial_context_scale)
         
-        self.final_conv1x1_bn_activation = ConvolutionBnActivation(self.n_classes, (1, 1), post_activation=final_activation)
+        self.final_conv1x1_bn_activation = ConvolutionBnActivation(self.n_classes, (1, 1), post_activation=None)
         self.final_upsampling2d = tf.keras.layers.UpSampling2D(size=8, interpolation="bilinear")
 
     def call(self, inputs, training=None, mask=None):
