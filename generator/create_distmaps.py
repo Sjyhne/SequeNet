@@ -20,12 +20,3 @@ def calc_dist_map_batch(y_true):
     y_true_numpy = y_true.numpy()
     return np.array([calc_dist_map(y)
                      for y in y_true_numpy]).astype(np.float32)
-
-def generate_dist_maps()
-
-
-if __name__ == "__main__":
-    
-    datatypes = ["train", "val", "test"]
-    
-    data_path = "data/"

@@ -1,11 +1,9 @@
-import tensorflow as tf
+import torch
 import numpy as np
 import cv2 as cv
-import matplotlib.pyplot as plt
 
 import random
 import os
-import json
 
 class ImageDataset:
     def __init__(self, image_paths, bsize, img_size, data_percentage=1.0) -> None:
@@ -66,7 +64,7 @@ class ImageDataset:
         image_paths = self.image_batches[idx]
         label_paths = self.label_batches[idx]
         imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
-        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 2))
+        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1]))
         names = []
         dist_maps = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 1))
         for i in range(self.bsize):
@@ -76,7 +74,8 @@ class ImageDataset:
             if lab[0, 0] > 1:
                 lab[lab == 30] = 0
                 lab[lab == 215] = 1
-            lab = tf.keras.utils.to_categorical(lab, num_classes=2)
+
+            lab = lab.squeeze()
             imgs[i] = img
             labs[i] = lab
             names.append(image_paths[i].split("/")[-1].split(".")[0])
@@ -84,10 +83,14 @@ class ImageDataset:
                 dist_maps[i] = np.load(os.path.join("data/large_building_area/ann_dir", "/".join(label_paths[i].split("/")[-2:]).split(".")[0] + ".npz.npy"))
             except Exception as e:
                 pass
-        tensor_imgs = tf.convert_to_tensor(imgs, dtype=tf.int64)
-        tensor_labs = tf.convert_to_tensor(labs, dtype=tf.uint8)
+        tensor_imgs = torch.tensor(imgs/255, dtype=torch.float32)
+        tensor_labs = torch.tensor(labs, dtype=torch.int64)
         
-        return tensor_imgs, tensor_labs, names, dist_maps
+        batch = {"imgs": tensor_imgs, "labs": tensor_labs, "names": names, "dist_maps": dist_maps, "orig_imgs": imgs}
+
+        print(tensor_imgs.shape, tensor_labs.shape, len(names), len(dist_maps))
+
+        return batch
 
 if __name__ == "__main__":
     pass
