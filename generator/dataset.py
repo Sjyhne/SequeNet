@@ -5,20 +5,20 @@ import cv2 as cv
 import random
 import os
 
-class ImageDataset:
+class ImageDataset(torch.utils.data.Dataset):
     def __init__(self, image_paths, bsize, img_size, data_percentage=1.0) -> None:
         self.image_paths = image_paths
         random.shuffle(self.image_paths)
         self.image_paths = self.image_paths[:int(len(self.image_paths) * data_percentage)]
         self.label_paths = self.get_label_paths()
-        self.bsize = bsize
+        #self.bsize = bsize
         self.img_size = img_size
     
-        self.image_batches, self.label_batches = self.generate_batches()
+        #self.image_batches, self.label_batches = self.generate_batches()
     
     def get_label_path(self, path):
         tmp = path.split("/")
-        path = os.path.join("/".join(tmp[:2]), "ann_dir", "/".join(tmp[3:]))
+        path = os.path.join("/".join(tmp[:3]), "ann_dir", "/".join(tmp[4:]))
         return path
     
     def get_label_paths(self):
@@ -58,15 +58,28 @@ class ImageDataset:
         return image_batch_paths, label_batch_paths
 
     def __len__(self):
-        return int(np.ceil(len(self.image_paths) / self.bsize))
+        return len(self.image_paths)
     
     def __getitem__(self, idx):
-        image_paths = self.image_batches[idx]
-        label_paths = self.label_batches[idx]
-        imgs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 3))
-        labs = np.ndarray((self.bsize, self.img_size[0], self.img_size[1]))
-        names = []
-        dist_maps = np.ndarray((self.bsize, self.img_size[0], self.img_size[1], 1))
+        image_path = self.image_paths[idx]
+        label_path = self.label_paths[idx]
+        img = cv.imread(image_path, cv.IMREAD_COLOR)
+        lab = cv.imread(label_path, cv.IMREAD_GRAYSCALE)
+        #lab = lab.reshape(self.img_size[0], self.img_size[1], 1)
+        if lab[0, 0] > 1:
+            lab[lab == 30] = 0
+            lab[lab == 215] = 1
+        #lab = lab.squeeze()
+        name = image_path.split("/")[-1].split(".")[0]
+        try:
+            dist_map = np.load(label_path.split(".")[0] + ".npy").squeeze()
+        except:
+            dist_map = []
+        
+        tensor_img = torch.tensor(img/255, dtype=torch.float32)
+        tensor_lab = torch.tensor(lab, dtype=torch.int64)
+        dist_map = torch.tensor(dist_map, dtype=torch.float32)
+        """
         for i in range(self.bsize):
             img = cv.imread(image_paths[i], cv.IMREAD_COLOR)
             lab = cv.imread(label_paths[i], cv.IMREAD_GRAYSCALE)
@@ -85,12 +98,12 @@ class ImageDataset:
                 pass
         tensor_imgs = torch.tensor(imgs/255, dtype=torch.float32)
         tensor_labs = torch.tensor(labs, dtype=torch.int64)
+        """
         
-        batch = {"imgs": tensor_imgs, "labs": tensor_labs, "names": names, "dist_maps": dist_maps, "orig_imgs": imgs}
+        res = {"img": tensor_img, "lab": tensor_lab, "name": name, "dist_map": dist_map, "orig_img": img}
 
-        print(tensor_imgs.shape, tensor_labs.shape, len(names), len(dist_maps))
 
-        return batch
+        return res
 
 if __name__ == "__main__":
     pass

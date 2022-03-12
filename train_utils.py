@@ -6,6 +6,9 @@ from matplotlib.gridspec import GridSpec
 
 from models.metrics import boundary_iou
 
+from models.label_smooth import LabelSmoothSoftmaxCEV1
+from models.abl import ABL
+
 import os
 import shutil
 import csv
@@ -19,7 +22,8 @@ pylab.rcParams.update(params)
 
 def aggregate_metrics(metrics, result):
     for key, value in result.items():
-        metrics[key].append(value)
+        if key != "logits":
+            metrics[key].append(value)
     
     return metrics
 
@@ -61,10 +65,29 @@ def display_and_store_metrics(train, eval, args):
             writer.writerow(headers)
             writer.writerow(losses)
 
+class ABLLoss(torch.nn.Module):
+    def __init__(self):
+        super(ABLLoss, self).__init__()
+        self.cc = torch.nn.CrossEntropyLoss()
+        self.lovasz_softmax = LabelSmoothSoftmaxCEV1()
+        self.abl = ABL()
+    
+    def forward(self, logits, targets, dist_maps):
+        cc_loss = self.cc(logits, targets)
+        lovasz_loss = self.lovasz_softmax(logits, targets)
+        abl_loss = self.abl(logits, targets, dist_maps)
+        
+        if abl_loss == None:
+            return cc_loss + lovasz_loss
+        else:
+            return cc_loss + lovasz_loss + abl_loss
+
 def get_loss(loss):
     if loss == "cce":
-        return torch.nn.CrossEntropyLoss
-
+        return torch.nn.CrossEntropyLoss()
+    if loss == "abl":
+        return ABLLoss()
+        
 def get_optim(optim):
     if optim == "adam":
         return torch.optim.Adam
@@ -72,8 +95,8 @@ def get_optim(optim):
 def calc_biou(pred_imgs, anns):
     biou = []
     for i, pi in enumerate(pred_imgs):
-        ann = anns[i].numpy().astype("uint8")
-        pred_img = pi.numpy().astype("uint8")
+        ann = anns[i].cpu().numpy().astype(np.uint8)
+        pred_img = pi.cpu().numpy().astype(np.uint8)
         biou.append(boundary_iou(ann, pred_img))
     
     return np.mean(biou)
@@ -83,28 +106,25 @@ def save_best_model(model, loss_value, best_loss_value, epoch, args):
         path = os.path.join("model_output", f"{args.training_mode}_{args.model}")
         for file in os.listdir(path):
             if "best_model" in file:
-                shutil.rmtree(os.path.join(path, file))
+                os.remove(os.path.join(path, file))
         save_path = os.path.join(path, f"{args.model}_best_model_{epoch}.pt")
         torch.save(model.state_dict(), save_path)
         return loss_value
     else:
         return best_loss_value
 
-def store_images(path, anns, imgs, pred_images, names):
+def store_images(path, batch, pred_images):
+    anns = batch["lab"]
+    imgs = np.uint8(batch["orig_img"])
+    names = batch["name"]
     os.makedirs(path)
-    print(anns.shape)
-    print(imgs.shape)
-    print(pred_images.shape)
-    anns = torch.permute(anns, (0, 2, 3, 1))
-    imgs = torch.permute(imgs, (0, 2, 3, 1))
+    anns = anns.unsqueeze(-1)
     pred_images = torch.permute(pred_images, (0, 2, 3, 1))
-    print(anns.shape)
-    print(imgs.shape)
-    print(pred_images.shape)
-    highlighted_images = (imgs.float() * torch.unsqueeze(torch.clip(pred_images[:, :, :, 1], 0.2, 1.0), dim=1))/255
-    main_build_gradients = torch.unsqueeze(pred_images[:, :, :, 1], dim=-1)
-    pred_images = torch.unsqueeze(torch.argmax(pred_images, dim=-1), dim=-1)
-    for i, pi in enumerate(pred_images):
+    pred_images = torch.nn.functional.softmax(pred_images, dim=-1).cpu().detach().numpy()
+    highlighted_images = np.uint8((np.float32(imgs) * np.expand_dims(np.clip(pred_images[:, :, :, 1], 0.2, 1.0), axis=-1)))
+    main_build_gradients = np.expand_dims(pred_images[:, :, :, 1], axis=-1)
+    pred_images = np.expand_dims(np.argmax(pred_images, axis=-1), axis=-1)
+    for i, pi in enumerate(pred_images[:6]):
         fig = plt.figure(constrained_layout=True)
         gs = GridSpec(3, 2, figure=fig)
         fig.add_subplot(gs[0, 0])
@@ -112,7 +132,6 @@ def store_images(path, anns, imgs, pred_images, names):
         fig.add_subplot(gs[1, 0])
         fig.add_subplot(gs[1, 1])
         fig.add_subplot(gs[2, 0])
-    
         fig.axes[0].imshow(imgs[i])
         fig.axes[0].set_title("RGB")
         fig.axes[1].imshow(highlighted_images[i])
@@ -120,9 +139,9 @@ def store_images(path, anns, imgs, pred_images, names):
         fig.axes[2].imshow(anns[i])
         fig.axes[2].set_title("Ground Truth")
         fig.axes[3].imshow(pi)
-        fig.axes[3].set_title("Mask")
+        fig.axes[3].set_title("Predicted Mask")
         fig.axes[4].imshow(main_build_gradients[i])
         fig.axes[4].set_title("Build Gradients")
         
-        plt.savefig(os.path.join(path, f"{names[i]}.png"), dpi=200)
+        plt.savefig(os.path.join(path, f"{names[i]}.png"), dpi=250)
         plt.close()

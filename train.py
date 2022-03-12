@@ -3,7 +3,7 @@ from torchmetrics import JaccardIndex, Accuracy
 from tqdm import tqdm
 import numpy as np
 
-from main_train_utils import aggregate_metrics, display_and_store_metrics, get_loss, get_optim, calc_biou
+from train_utils import aggregate_metrics, display_and_store_metrics, get_loss, get_optim, calc_biou, save_best_model, store_images
 from models.model_hub import get_model
 from generator import create_dataset_generator
 
@@ -13,46 +13,53 @@ import shutil
 import os
 import time
 
-JACCARD_INDEX = JaccardIndex(num_classes=2)
-ACCURACY = Accuracy(num_classes=2)
+JACCARD_INDEX = JaccardIndex(num_classes=2, ignore_index=255).to("cuda:0")
+ACCURACY = Accuracy(num_classes=2).to("cuda:0")
 
 def compute_metrics(logits, labs):
     pred_masks = torch.argmax(torch.nn.functional.softmax(logits, dim=1), dim=1)
+    ji_pred_mask = torch.nn.functional.softmax(logits, dim=1)[:, 1, :, :]
     lab_masks = labs
-    miou = JACCARD_INDEX(pred_masks, lab_masks)
+    miou = JACCARD_INDEX(ji_pred_mask, lab_masks)
     biou = calc_biou(pred_masks, lab_masks)
     acc = ACCURACY(pred_masks, lab_masks)
 
-    return acc, miou, biou
+    return acc.cpu().numpy(), miou.cpu().numpy(), biou
 
 
 def train_step(model, batch, loss_fn, optim, args):
-    imgs = batch["imgs"].to(args.device)
-    labs = batch["labs"].to(args.device)
+    imgs = batch["img"].to(args.device)
+    labs = batch["lab"].to(args.device)
     
     imgs = torch.permute(imgs, (0, 3, 1, 2))
     
     optim.zero_grad()
 
     logits = model(imgs)
-    loss = loss_fn(logits, labs)
+    if args.loss == "abl":
+        loss = loss_fn(logits, labs, batch["dist_map"].to(args.device))
+    else:
+        loss = loss_fn(logits, labs)
     loss.backward()
     optim.step()
     acc, miou, biou = compute_metrics(logits, labs)
 
-    return {"loss": loss.item(), "miou": miou, "biou": biou, "acc": acc}
+    return {"loss": loss.item(), "miou": miou, "biou": biou, "acc": acc, "logits": logits}
 
 def eval_step(model, batch, loss_fn, args):
-    imgs = batch["imgs"].to(args.device)
-    labs = batch["labs"].to(args.device)
+    imgs = batch["img"].to(args.device)
+    labs = batch["lab"].to(args.device)
 
     imgs = torch.permute(imgs, (0, 3, 1, 2))
 
     logits = model(imgs)
-    loss = loss_fn(logits, labs)
+    if args.loss == "abl":
+        loss = loss_fn(logits, labs, batch["dist_map"].to(args.device))
+    else:
+        loss = loss_fn(logits, labs)
     acc, miou, biou = compute_metrics(logits, labs)
 
-    return {"loss": loss.item(), "miou": miou, "biou": biou, "acc": acc}
+    return {"loss": loss.item(), "miou": miou, "biou": biou, "acc": acc, "logits": logits}
     
 
 def train(args, train_ds, val_ds):
@@ -80,9 +87,9 @@ def train(args, train_ds, val_ds):
     
     # TODO: Find a good way to combine the loss functions -- maybe just return a function
     # That calculates the loss function?
-    model = get_model(args.model)(args.num_channels, args.num_classes).to(args.device)
+    model = get_model(args.model).to(args.device)
     optim = get_optim(args.optim)(model.parameters(), lr=args.lr)
-    loss_fn = get_loss(args.loss)()
+    loss_fn = get_loss(args.loss)
 
     best_loss_value = None
 
@@ -111,27 +118,29 @@ def train(args, train_ds, val_ds):
 
 
         model.train()
-        for step, batch in tqdm(enumerate(train_ds), total=len(train_ds)):
+        for step, batch in tqdm(enumerate(train_ds), total=len(train_ds), leave=False):
             # res: {"loss": loss.item(), "logits": logits}
             res = train_step(model, batch, loss_fn, optim, args)
             train_metrics = aggregate_metrics(train_metrics, res)
-            print(train_metrics)
+            if step == len(train_ds) - 1:
+                store_images(os.path.join(output_path, "train", str(epoch + 1)), batch, res["logits"])
+            
+            del batch
 
         for key in train_metrics.keys():
             train_metrics[key] = np.mean(train_metrics[key])
 
-        print("Training metrics:", train_metrics)
-
         model.eval()
-        for step, batch in tqdm(enumerate(val_ds), total=len(val_ds)):
+        for step, batch in tqdm(enumerate(val_ds), total=len(val_ds), leave=False):
             res = eval_step(model, batch, loss_fn, args)
-            print(res)
             eval_metrics = aggregate_metrics(eval_metrics, res)
+            if step == len(val_ds) - 1:
+                store_images(os.path.join(output_path, "val", str(epoch + 1)), batch, res["logits"])
+            
+            del batch
 
         for key in eval_metrics.keys():
             eval_metrics[key] = np.mean(eval_metrics[key])
-
-        print("Eval metrics:", eval_metrics)
 
         time_taken = round(time.time() - start_time, 3)
         print("Current time taken since start:", time_taken, "seconds or", round(time_taken/60, 3), "minutes or", round(time_taken/(60*60), 3), "hours")
@@ -153,7 +162,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_classes", type=int, default=2, help="The number of classes to predict")
     parser.add_argument("--model", type=str, default="unet", help="The model type to be trained")
     parser.add_argument("--batch_size", type=int, default=8, help="The batchsize used for the training")
-    parser.add_argument("--data_path", type=str, default="data/large_building_area/img_dir", help="Path to data used for training")
+    parser.add_argument("--data_path", type=str, default="data/large_building_area_224", help="Path to data used for training")
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
     parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
     parser.add_argument("--loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
@@ -167,9 +176,9 @@ if __name__ == "__main__":
     print("Args:", args)
 
     if args.dataset == "lba":
-        train_ds = create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage)
-        val_ds = create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage)
-        test_ds = create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage)
+        train_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage), shuffle=True, batch_size=args.batch_size)
+        val_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage), shuffle=False, batch_size=args.batch_size)
+        test_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage), shuffle=False, batch_size=args.batch_size)
 
     print("Dataset sizes")
     print("Train:\t", len(train_ds))
