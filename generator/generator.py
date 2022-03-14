@@ -19,8 +19,12 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
     heigth, width = image_size
 
     data_dir = os.path.join(datapath, datatype, "img_dir")
+    
+    print(data_dir)
 
     img_paths = [os.path.join(data_dir, file) for file in os.listdir(data_dir) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
+    
+    print(len(img_paths))
     
     if create_dist:
         print(os.path.join("/".join(datapath.split("/")[:-1]), "ann_dir", datatype))

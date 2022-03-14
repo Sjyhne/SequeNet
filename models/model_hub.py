@@ -1,8 +1,9 @@
 import torch
 from .models.simple_unet import UNET
 import segmentation_models_pytorch as smp
+from torchsummary import summary
 
-ENCODER = "efficientnet-b2"
+ENCODER = "efficientnet-b0"
 ENCODER_WEIGHTS = "imagenet"
 
 def get_model(model):
@@ -27,13 +28,15 @@ def get_model(model):
             in_channels=3,
             classes=2,
         )
-    elif model == "pan":
-        model = smp.PAN(
+    elif model == "manet":
+        model = smp.MAnet(
             encoder_name=ENCODER,
             encoder_weights=ENCODER_WEIGHTS,
             in_channels=3,
             classes=2,
         )
+    
+    print(summary(model.cuda(), (3, 224, 224)))
         
     return model
     

@@ -3,7 +3,7 @@ from torchmetrics import JaccardIndex, Accuracy
 from tqdm import tqdm
 import numpy as np
 
-from train_utils import aggregate_metrics, display_and_store_metrics, get_loss, get_optim, calc_biou, save_best_model, store_images
+from train_utils import aggregate_metrics, display_and_store_metrics, get_loss, get_optim, calc_biou, save_best_model, store_images, iou_pytorch
 from models.model_hub import get_model
 from generator import create_dataset_generator
 
@@ -18,9 +18,8 @@ ACCURACY = Accuracy(num_classes=2).to("cuda:0")
 
 def compute_metrics(logits, labs):
     pred_masks = torch.argmax(torch.nn.functional.softmax(logits, dim=1), dim=1)
-    ji_pred_mask = torch.nn.functional.softmax(logits, dim=1)[:, 1, :, :]
     lab_masks = labs
-    miou = JACCARD_INDEX(ji_pred_mask, lab_masks)
+    miou = iou_pytorch(pred_masks, lab_masks)
     biou = calc_biou(pred_masks, lab_masks)
     acc = ACCURACY(pred_masks, lab_masks)
 
@@ -148,7 +147,7 @@ def train(args, train_ds, val_ds):
 
         display_and_store_metrics(train_metrics, eval_metrics, args)
 
-        best_loss_value = save_best_model(model, round(eval_metrics["loss"], 6), best_loss_value, epoch, args)
+        best_loss_value = save_best_model(model, round(eval_metrics["loss"], 6), best_loss_value, epoch + 1, args)
 
 
 
@@ -162,7 +161,6 @@ if __name__ == "__main__":
     parser.add_argument("--num_classes", type=int, default=2, help="The number of classes to predict")
     parser.add_argument("--model", type=str, default="unet", help="The model type to be trained")
     parser.add_argument("--batch_size", type=int, default=8, help="The batchsize used for the training")
-    parser.add_argument("--data_path", type=str, default="data/large_building_area_224", help="Path to data used for training")
     parser.add_argument("--data_percentage", type=float, default=1.0, help="The percentage size of data to be used during training")
     parser.add_argument("--dataset", type=str, default="lba", help="The dataset of choosing for the training and/or evaluation")
     parser.add_argument("--loss", type=str, default="cce", help="The loss function to be used for the main segmentation network")
@@ -172,6 +170,11 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda:0", help="What type of device to be used for training")
 
     args = parser.parse_args()
+    
+    if args.image_dim == 224:
+        args.data_path = "data/large_building_area_224"
+    elif args.image_dim == 512:
+        args.data_path = "data/large_building_area"
 
     print("Args:", args)
 
