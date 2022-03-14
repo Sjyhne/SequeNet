@@ -89,7 +89,7 @@ def train(args, train_ds, val_ds):
     model = get_model(args.model).to(args.device)
     optim = get_optim(args.optim)(model.parameters(), lr=args.lr)
     loss_fn = get_loss(args.loss)
-
+    
     best_loss_value = None
 
     print("-----------------------------------------")
@@ -149,8 +149,6 @@ def train(args, train_ds, val_ds):
 
         best_loss_value = save_best_model(model, round(eval_metrics["loss"], 6), best_loss_value, epoch + 1, args)
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add custom arguments for the training of the model(s)")
     # TODO: This should be revised -- maybe added in a config file or something
@@ -176,6 +174,12 @@ if __name__ == "__main__":
     elif args.image_dim == 512:
         args.data_path = "data/large_building_area"
 
+    if args.image_dim == 224:
+        args.data_path = "data/large_building_area_224"
+    elif args.image_dim == 512:
+        args.data_path = "data/large_building_area"
+
+    
     print("Args:", args)
 
     if args.dataset == "lba":

@@ -77,10 +77,11 @@ class ABLLoss(torch.nn.Module):
         lovasz_loss = self.lovasz_softmax(logits, targets)
         abl_loss = self.abl(logits, targets, dist_maps)
         
+        
         if abl_loss == None:
             return cc_loss + lovasz_loss
         else:
-            return cc_loss + lovasz_loss + abl_loss
+            return cc_loss + (abl_loss * 0.8) + lovasz_loss
 
 def get_loss(loss):
     if loss == "cce":
@@ -91,6 +92,8 @@ def get_loss(loss):
 def get_optim(optim):
     if optim == "adam":
         return torch.optim.Adam
+    elif optim == "sgd":
+        return torch.optim.SGD
 
 def calc_biou(pred_imgs, anns):
     biou = []
@@ -146,6 +149,7 @@ def store_images(path, batch, pred_images):
         plt.savefig(os.path.join(path, f"{names[i]}.png"), dpi=250)
         plt.close()
 
+        
 SMOOTH = 1e-6
 
 def iou_pytorch(outputs: torch.Tensor, labels: torch.Tensor):

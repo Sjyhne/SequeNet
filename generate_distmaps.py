@@ -19,7 +19,9 @@ if __name__ == "__main__":
     
     path = os.path.join("data", args.dn)
     
-    image_folders = [os.path.join(path, folder, "ann_dir") for folder in os.listdir(path)]
+    folders = os.listdir(path)[1:]
+    
+    image_folders = [os.path.join(path, folder, "ann_dir") for folder in folders]
     
     for folder_path in image_folders:
         print("Folder path:", folder_path)
@@ -28,9 +30,13 @@ if __name__ == "__main__":
                 filepath = os.path.join(folder_path, file)
                 target = cv.imread(filepath, cv.IMREAD_GRAYSCALE)
                 target = torch.tensor(np.expand_dims(target, axis=0))
-                dist_map = create_distmaps(target).numpy()
+                dist_map = np.uint8(create_distmaps(target).numpy())
                 dist_path = filepath.split(".")[0] + ".npy"
                 if dist_map.shape == 4:
                     dist_map = np.squeeze(dist_map)
+                if dist_map.shape[2] > 256:
+                    dist_map = np.uint16(dist_map)
+                else:
+                    dist_map = np.uint8(dist_map)
                 np.save(dist_path, dist_map)
     
