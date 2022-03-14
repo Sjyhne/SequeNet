@@ -73,7 +73,8 @@ class ImageDataset(torch.utils.data.Dataset):
         name = image_path.split("/")[-1].split(".")[0]
         try:
             dist_map = np.load(label_path.split(".")[0] + ".npy").squeeze()
-        except:
+        except Exception as e:
+            print(e)
             dist_map = []
         
         tensor_img = torch.tensor(img/255, dtype=torch.float32)

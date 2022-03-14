@@ -2,7 +2,7 @@ import torch
 from .models.simple_unet import UNET
 import segmentation_models_pytorch as smp
 
-ENCODER = "efficientnet-b2"
+ENCODER = "efficientnet-b0"
 ENCODER_WEIGHTS = "imagenet"
 
 def get_model(model):

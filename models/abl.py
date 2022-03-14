@@ -30,7 +30,7 @@ def class2one_hot(seg, C):
 
 # Active Boundary Loss
 class ABL(nn.Module):
-    def __init__(self, isdetach=True, max_N_ratio = 1/100, ignore_label = 255, label_smoothing=0.2, weight = None, max_clip_dist = 20.):
+    def __init__(self, isdetach=True, max_N_ratio = 1/100, ignore_label = 255, label_smoothing=0.0, weight = None, max_clip_dist = 20.):
         super(ABL, self).__init__()
         self.ignore_label = ignore_label
         self.label_smoothing = label_smoothing
@@ -61,6 +61,7 @@ class ABL(nn.Module):
                 ignore_index=ignore_label,
                 lb_smooth = label_smoothing
             )
+        print(label_smoothing)
 
     def logits2boundary(self, logit):
         eps = 1e-5
