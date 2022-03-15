@@ -172,14 +172,9 @@ if __name__ == "__main__":
     parser.add_argument("--abl_weight", type=float, default=1.0, help="What the loss value of the abl should should be weighted with")
     
     args = parser.parse_args()
-    
-    if args.image_dim == 224:
-        args.data_path = "data/large_building_area_224"
-    elif args.image_dim == 512:
-        args.data_path = "data/large_building_area"
 
     if args.image_dim == 224:
-        args.data_path = "data/large_building_area_224"
+        args.data_path = "data/primary_deeplab_large_building_area_224"
     elif args.image_dim == 512:
         args.data_path = "data/large_building_area"
 
