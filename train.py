@@ -168,14 +168,9 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda:0", help="What type of device to be used for training")
 
     args = parser.parse_args()
-    
-    if args.image_dim == 224:
-        args.data_path = "data/large_building_area_224"
-    elif args.image_dim == 512:
-        args.data_path = "data/large_building_area"
 
     if args.image_dim == 224:
-        args.data_path = "data/large_building_area_224"
+        args.data_path = "data/primary_deeplab_large_building_area_224"
     elif args.image_dim == 512:
         args.data_path = "data/large_building_area"
 
