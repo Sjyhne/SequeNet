@@ -8,6 +8,7 @@ from models.metrics import boundary_iou
 
 from models.label_smooth import LabelSmoothSoftmaxCEV1
 from models.abl import ABL
+from models.models.loss.rmi import RMILoss
 
 import os
 import shutil
@@ -71,7 +72,7 @@ def display_and_store_metrics(train, eval, args):
 class ABLLoss(torch.nn.Module):
     def __init__(self, abl_weight = 1.0):
         super(ABLLoss, self).__init__()
-        self.cc = torch.nn.CrossEntropyLoss()
+        self.cc = RMILoss(num_classes=2)
         self.lovasz_softmax = LabelSmoothSoftmaxCEV1()
         self.abl = ABL()
         self.abl_weight = abl_weight
@@ -92,6 +93,8 @@ def get_loss(args):
         return torch.nn.CrossEntropyLoss()
     if args.loss == "abl":
         return ABLLoss(abl_weight = args.abl_weight)
+    if args.loss == "rmi":
+        return RMILoss(num_classes=args.num_classes)
         
 def get_optim(optim):
     if optim == "adam":

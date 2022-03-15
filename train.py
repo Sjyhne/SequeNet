@@ -63,7 +63,7 @@ def eval_step(model, batch, loss_fn, args):
 
 def train(args, train_ds, val_ds):
 
-    output_path = os.path.join("model_output", args.training_mode + "_" + args.model + "_e" + args.epochs + "_" + args.image_dim + "_" + args.loss)
+    output_path = os.path.join("model_output", args.training_mode + "_" + args.model + "_e" + str(args.epochs) + "_" + str(args.image_dim) + "_" + args.loss)
     print("Output path:", output_path)
 
     if os.path.exists(output_path):
@@ -72,7 +72,7 @@ def train(args, train_ds, val_ds):
             ans = input(f"Sure you want to delete contents in {output_path}? ")
         if ans == "y":
             print("Removing the contents")
-            shutil.rmtree(os.path.join("model_output", args.training_mode + "_" + args.model))
+            shutil.rmtree(output_path)
             print("Successfully removed the contents")
         else:
             raise RuntimeError("Exiting based on the command specified by the user")
@@ -86,7 +86,7 @@ def train(args, train_ds, val_ds):
     
     # TODO: Find a good way to combine the loss functions -- maybe just return a function
     # That calculates the loss function?
-    model = get_model(args.model).to(args.device)
+    model = get_model(args).to(args.device)
     optim = get_optim(args.optim)(model.parameters(), lr=args.lr)
     loss_fn = get_loss(args)
     

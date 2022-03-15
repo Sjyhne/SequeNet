@@ -132,3 +132,4 @@ output_images/
 logs
 *.pyc
 model_output
+models/models/pretrainedweights

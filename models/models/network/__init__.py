@@ -6,7 +6,7 @@ import importlib
 import torch
 
 
-from config import cfg
+from ..config import cfg
 
 
 def get_net(args, criterion):

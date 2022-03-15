@@ -41,7 +41,7 @@ import torchvision.utils as vutils
 from tabulate import tabulate
 from PIL import Image
 
-from config import cfg
+from ..config import cfg
 
 
 def fast_hist(pred, gtruth, num_classes):

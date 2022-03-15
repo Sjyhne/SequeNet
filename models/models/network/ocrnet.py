@@ -1,13 +1,13 @@
 from torch import nn
 
-from network.mynn import Upsample, scale_as, initialize_weights
-from network.mynn import ResizeX
-from network.utils import get_trunk
-from network.utils import BNReLU
-from network.utils import make_attn_head
-from network.ocr_utils import SpatialGather_Module, SpatialOCR_Module
-from config import cfg
-from utils.misc import fmt_scale
+from .mynn import Upsample, scale_as, initialize_weights
+from .mynn import ResizeX
+from .utils import get_trunk
+from .utils import BNReLU
+from .utils import make_attn_head
+from .ocr_utils import SpatialGather_Module, SpatialOCR_Module
+from ..config import cfg
+from ..utils.misc import fmt_scale
 
 
 class OCR_block(nn.Module):
@@ -294,7 +294,7 @@ class MscaleOCR(nn.Module):
                 loss_hi = self.criterion(pred_10x, gts, do_rmi=False)
                 loss += cfg.LOSS.SUPERVISED_MSCALE_WT * loss_lo
                 loss += cfg.LOSS.SUPERVISED_MSCALE_WT * loss_hi
-            return loss
+            return loss, joint_pred
         else:
             output_dict = {
                 'pred': joint_pred,

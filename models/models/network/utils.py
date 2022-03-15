@@ -7,9 +7,9 @@ import torch.nn.functional as F
 from torch import nn
 
 #from network.mynn import Norm2d, Upsample
-import network.hrnetv2 as hrnetv2
+from . import hrnetv2 as hrnetv2
 
-from config import cfg
+from ..config import cfg
 
 def get_trunk(trunk_name, output_stride=8):
     """
