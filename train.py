@@ -63,7 +63,7 @@ def eval_step(model, batch, loss_fn, args):
 
 def train(args, train_ds, val_ds):
 
-    output_path = os.path.join("model_output", args.training_mode + "_" + args.model)
+    output_path = os.path.join("model_output", args.training_mode + "_" + args.model + "_e" + args.epochs + "_" + args.image_dim + "_" + args.loss)
     print("Output path:", output_path)
 
     if os.path.exists(output_path):
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.image_dim == 224:
-        args.data_path = "data/primary_deeplab_large_building_area_224"
+        args.data_path = "data/large_building_area_224"
     elif args.image_dim == 512:
         args.data_path = "data/large_building_area"
 

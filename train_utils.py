@@ -23,7 +23,10 @@ pylab.rcParams.update(params)
 def aggregate_metrics(metrics, result):
     for key, value in result.items():
         if key != "logits":
-            metrics[key].append(value)
+            if value != np.nan:
+                metrics[key].append(value)
+            else:
+                print("Error:", key, "-", value)
     
     return metrics
 
