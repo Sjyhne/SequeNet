@@ -66,28 +66,29 @@ def display_and_store_metrics(train, eval, args):
             writer.writerow(losses)
 
 class ABLLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, abl_weight = 1.0):
         super(ABLLoss, self).__init__()
         self.cc = torch.nn.CrossEntropyLoss()
         self.lovasz_softmax = LabelSmoothSoftmaxCEV1()
         self.abl = ABL()
+        self.abl_weight = abl_weight
     
-    def forward(self, logits, targets, dist_maps):
+    def forward(self, logits, targets, dist_maps, save=False):
         cc_loss = self.cc(logits, targets)
         lovasz_loss = self.lovasz_softmax(logits, targets)
-        abl_loss = self.abl(logits, targets, dist_maps)
+        abl_loss = self.abl(logits, targets, dist_maps, save)
         
         
         if abl_loss == None:
             return cc_loss + lovasz_loss
         else:
-            return cc_loss + (abl_loss * 0.8) + lovasz_loss
+            return cc_loss + (abl_loss * self.abl_weight) + lovasz_loss
 
-def get_loss(loss):
-    if loss == "cce":
+def get_loss(args):
+    if args.loss == "cce":
         return torch.nn.CrossEntropyLoss()
-    if loss == "abl":
-        return ABLLoss()
+    if args.loss == "abl":
+        return ABLLoss(abl_weight = args.abl_weight)
         
 def get_optim(optim):
     if optim == "adam":

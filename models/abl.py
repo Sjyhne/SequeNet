@@ -9,6 +9,7 @@ from .label_smooth import LabelSmoothSoftmaxCEV1 as LSSCE
 from torchvision import transforms
 from functools import partial
 from operator import itemgetter
+import matplotlib.pyplot as plt
 
 # Tools
 def kl_div(a,b): # q,p
@@ -36,6 +37,8 @@ class ABL(nn.Module):
         self.label_smoothing = label_smoothing
         self.isdetach=isdetach
         self.max_N_ratio = max_N_ratio
+        
+        # TODO: Set max max_N value
 
         self.weight_func = lambda w, max_distance=max_clip_dist: torch.clamp(w, max=max_distance) / max_distance
 
@@ -63,24 +66,27 @@ class ABL(nn.Module):
             )
         print(label_smoothing)
 
-    def logits2boundary(self, logit):
-        eps = 1e-5
-        _, _, h, w = logit.shape
-        max_N = (h*w) * self.max_N_ratio
+    def logits2boundary(self, logit, gt_boundary):
+        n, _, h, w = logit.shape
+        eps = torch.full((n,), 1e-3)
+        batch_max_N = gt_boundary.sum((1, 2)) * 0.75
         kl_lr = kl_div(logit[:, :, 1:, :], logit[:, :, :-1, :]).sum(1, keepdim=True)
         kl_ud = kl_div(logit[:, :, :, 1:], logit[:, :, :, :-1]).sum(1, keepdim=True)
-        kl_lr = torch.nn.functional.pad(
-            kl_lr, [0, 0, 0, 1, 0, 0, 0, 0], mode='constant', value=0)
-        kl_ud = torch.nn.functional.pad(
-            kl_ud, [0, 1, 0, 0, 0, 0, 0, 0], mode='constant', value=0)
+        kl_lr = torch.nn.functional.pad(kl_lr, [0, 0, 0, 1, 0, 0, 0, 0], mode='constant', value=0)
+        kl_ud = torch.nn.functional.pad(kl_ud, [0, 1, 0, 0, 0, 0, 0, 0], mode='constant', value=0)
         kl_combine = kl_lr+kl_ud
-        while True: # avoid the case that full image is the same color
-            kl_combine_bin = (kl_combine > eps).to(torch.float)
-            if kl_combine_bin.sum() > max_N:
-                eps *=1.2
-            else:
-                break
-        #dilate
+        kl_combine = torch.squeeze(kl_combine)
+        kl_combine_bin = torch.full((n, h, w), 0.0).cuda()
+        for idx, _ in enumerate(kl_combine):
+            while True: # avoid the case that full image is the same colo
+                kl_combine_bin[idx] = (kl_combine[idx] > eps[idx]).to(torch.float32)
+                if kl_combine_bin[idx].sum() > batch_max_N[idx]:
+                    eps[idx] = eps[idx] * 1.1
+                else:
+                    break
+                    
+        kl_combine_bin = torch.unsqueeze(kl_combine_bin, dim=1)
+
         dilate_weight = torch.ones((1,1,3,3)).cuda()
         edge2 = torch.nn.functional.conv2d(kl_combine_bin, dilate_weight, stride=1, padding=1)
         edge2 = edge2.squeeze(1)  # NCHW->NHW
@@ -170,23 +176,32 @@ class ABL(nn.Module):
         
         return out
 
-    def forward(self, logits, target, dist_maps):
+    def forward(self, logits, target, dist_maps, save=False):
         
-        if logits.shape[1] < logits.shape[2]:
-            logits = torch.permute(logits, (0, 2, 3, 1))
+        ph, pw = logits.size(2), logits.size(3)
+        h, w = target.size(1), target.size(2)
         
-        #ph, pw = logits.size(2), logits.size(3)
-        #h, w = target.size(1), target.size(2)
+        if ph != h or pw != w:
+            print("interpolated")
+            logits = F.interpolate(input=logits, size=(
+                h, w), mode='bilinear', align_corners=True)
 
-        #if ph != h or pw != w:
-            #logits = F.interpolate(input=logits, size=(
-                #h, w), mode='bilinear', align_corners=True)
+        gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
 
-        #gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
+        dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
 
-        #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
-
-        pred_boundary = self.logits2boundary(logits)
+        pred_boundary = self.logits2boundary(logits, gt_boundary)
+        
+        if save:
+            plt.imshow(pred_boundary[0].cpu().numpy())
+            plt.savefig("pred_boundary.png", dpi=150)
+            plt.imshow(gt_boundary[0].cpu().numpy())
+            plt.savefig("gt_boundary.png", dpi=150)
+            plt.imshow(dist_maps[0].cpu().numpy())
+            plt.savefig("dist_maps.png", dpi=150)
+        
+        save = False
+        
         if pred_boundary.sum() < 1: # avoid nan
             return None # you should check in the outside. if None, skip this loss.
         

@@ -1,5 +1,7 @@
 import torch
 from .models.simple_unet import UNET
+from .models.ddrnet import DDRNet
+#from .models.network.ocrnet import HRNet_Mscale
 import segmentation_models_pytorch as smp
 from torchsummary import summary
 
@@ -35,6 +37,10 @@ def get_model(model):
             in_channels=3,
             classes=2,
         )
+    elif model == "ddrnet":
+        return DDRNet(num_classes=2)
+    #elif model == "mscale":
+    #    return HRNet_Mscale(2)
     
     print(summary(model.cuda(), (3, 224, 224)))
         

@@ -26,7 +26,7 @@ def compute_metrics(logits, labs):
     return acc.cpu().numpy(), miou.cpu().numpy(), biou
 
 
-def train_step(model, batch, loss_fn, optim, args):
+def train_step(model, batch, loss_fn, optim, args, save=False):
     imgs = batch["img"].to(args.device)
     labs = batch["lab"].to(args.device)
     
@@ -36,7 +36,7 @@ def train_step(model, batch, loss_fn, optim, args):
 
     logits = model(imgs)
     if args.loss == "abl":
-        loss = loss_fn(logits, labs, batch["dist_map"].to(args.device))
+        loss = loss_fn(logits, labs, batch["dist_map"].to(args.device), save)
     else:
         loss = loss_fn(logits, labs)
     loss.backward()
@@ -88,7 +88,7 @@ def train(args, train_ds, val_ds):
     # That calculates the loss function?
     model = get_model(args.model).to(args.device)
     optim = get_optim(args.optim)(model.parameters(), lr=args.lr)
-    loss_fn = get_loss(args.loss)
+    loss_fn = get_loss(args)
     
     best_loss_value = None
 
@@ -119,7 +119,10 @@ def train(args, train_ds, val_ds):
         model.train()
         for step, batch in tqdm(enumerate(train_ds), total=len(train_ds), leave=False):
             # res: {"loss": loss.item(), "logits": logits}
-            res = train_step(model, batch, loss_fn, optim, args)
+            if step == len(train_ds) - 1:
+                res = train_step(model, batch, loss_fn, optim, args, save=True)
+            else:
+                res = train_step(model, batch, loss_fn, optim, args, save=False)
             train_metrics = aggregate_metrics(train_metrics, res)
             if step == len(train_ds) - 1:
                 store_images(os.path.join(output_path, "train", str(epoch + 1)), batch, res["logits"])
@@ -166,7 +169,8 @@ if __name__ == "__main__":
     parser.add_argument("--training_mode", type=str, default="primary", help="Is it the primary or secondary network being trained?")
     parser.add_argument("--optim", type=str, default="adam", help="Which optimizer to be used for the training")
     parser.add_argument("--device", type=str, default="cuda:0", help="What type of device to be used for training")
-
+    parser.add_argument("--abl_weight", type=float, default=1.0, help="What the loss value of the abl should should be weighted with")
+    
     args = parser.parse_args()
     
     if args.image_dim == 224:
