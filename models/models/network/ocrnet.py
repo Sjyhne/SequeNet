@@ -28,8 +28,6 @@ class OCR_block(nn.Module):
             BNReLU(ocr_mid_channels),
         )
     
-        print("hihg", high_level_ch)
-
         self.ocr_gather_head = SpatialGather_Module(num_classes)
         self.ocr_distri_head = SpatialOCR_Module(in_channels=ocr_mid_channels,
                                                  key_channels=ocr_key_channels,
@@ -130,12 +128,12 @@ class OCRNetASPP(nn.Module):
             return output_dict
 
 
-class MscaleOCR(nn.Module):
+class MScale(nn.Module):
     """
     OCR net
     """
     def __init__(self, num_classes, trunk='hrnetv2', criterion=None):
-        super(MscaleOCR, self).__init__()
+        super(MScale, self).__init__()
         self.criterion = criterion
         self.backbone, _, _, high_level_ch = get_trunk(trunk)
         self.ocr = OCR_block(high_level_ch)
@@ -184,7 +182,6 @@ class MscaleOCR(nn.Module):
           If training, return loss, else return prediction + attention
         """
         x_1x = inputs['images']
-        print("ja")
         assert 1.0 in scales, 'expected 1.0 to be the target scale'
         # Lower resolution provides attention for higher rez predictions,
         # so we evaluate in order: high to low
@@ -227,14 +224,12 @@ class MscaleOCR(nn.Module):
                 aux = aux_out + (1 - attn_out) * aux
 
         if self.training:
-            print("KORREKT")
             assert 'gts' in inputs
             gts = inputs['gts']
             loss = cfg.LOSS.OCR_ALPHA * self.criterion(aux, gts) + \
                 self.criterion(pred, gts)
             return loss
         else:
-            print("FEIL")
             output_dict['pred'] = pred
             return output_dict
 
@@ -247,8 +242,7 @@ class MscaleOCR(nn.Module):
         If we use attention to combine the aux outputs, then
         we can use normal weighting for aux vs. cls outputs
         """
-        assert 'images' in inputs
-        x_1x = inputs['images']
+        x_1x = inputs
   
         x_lo = ResizeX(x_1x, cfg.MODEL.MSCALE_LO_SCALE)
         lo_outs = self._fwd(x_lo)
@@ -274,35 +268,34 @@ class MscaleOCR(nn.Module):
         joint_pred = p_lo + (1 - logit_attn) * p_1x
         joint_aux = aux_lo + (1 - logit_attn) * aux_1x
 
-        if self.training:
-            print("HIE")
-            gts = inputs['gts']
-            do_rmi = cfg.LOSS.OCR_AUX_RMI
-            aux_loss = self.criterion(joint_aux, gts, do_rmi=do_rmi)
+        #if self.training:
+            #print("HIE")
+            #gts = inputs['gts']
+            #do_rmi = cfg.LOSS.OCR_AUX_RMI
+            #aux_loss = self.criterion(joint_aux, gts, do_rmi=do_rmi)
 
             # Optionally turn off RMI loss for first epoch to try to work
             # around cholesky errors of singular matrix
-            do_rmi_main = True  # cfg.EPOCH > 0
-            main_loss = self.criterion(joint_pred, gts, do_rmi=do_rmi_main)
-            loss = cfg.LOSS.OCR_ALPHA * aux_loss + main_loss
+            #do_rmi_main = True  # cfg.EPOCH > 0
+            #main_loss = self.criterion(joint_pred, gts, do_rmi=do_rmi_main)
+            #loss = cfg.LOSS.OCR_ALPHA * aux_loss + main_loss
 
             # Optionally, apply supervision to the multi-scale predictions
             # directly. Turn off RMI to keep things lightweight
-            if cfg.LOSS.SUPERVISED_MSCALE_WT:
-                scaled_pred_05x = scale_as(pred_05x, p_1x)
-                loss_lo = self.criterion(scaled_pred_05x, gts, do_rmi=False)
-                loss_hi = self.criterion(pred_10x, gts, do_rmi=False)
-                loss += cfg.LOSS.SUPERVISED_MSCALE_WT * loss_lo
-                loss += cfg.LOSS.SUPERVISED_MSCALE_WT * loss_hi
-            return loss, joint_pred
-        else:
-            output_dict = {
-                'pred': joint_pred,
-                'pred_05x': pred_05x,
-                'pred_10x': pred_10x,
-                'attn_05x': attn_05x,
-            }
-            return output_dict
+            #if cfg.LOSS.SUPERVISED_MSCALE_WT:
+            #    scaled_pred_05x = scale_as(pred_05x, p_1x)
+            #    loss_lo = self.criterion(scaled_pred_05x, gts, do_rmi=False)
+            #    loss_hi = self.criterion(pred_10x, gts, do_rmi=False)
+            #    loss += cfg.LOSS.SUPERVISED_MSCALE_WT * loss_lo
+            #    loss += cfg.LOSS.SUPERVISED_MSCALE_WT * loss_hi
+        return joint_pred
+        #    output_dict = {
+        #        'pred': joint_pred,
+        #        'pred_05x': pred_05x,
+        #        'pred_10x': pred_10x,
+        #        'attn_05x': attn_05x,
+        #    }
+        #    return output_dict
 
     def forward(self, inputs):
         
@@ -317,4 +310,6 @@ def HRNet(num_classes, criterion):
 
 
 def HRNet_Mscale(num_classes, criterion):
-    return MscaleOCR(num_classes, trunk='hrnetv2', criterion=criterion)
+    model =  MScale(num_classes, trunk='hrnetv2', criterion=criterion)
+    model.backbone.init_weights(cfg.ASSETS_PATH)
+    return model

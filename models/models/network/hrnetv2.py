@@ -452,9 +452,10 @@ class HighResolutionNet(nn.Module):
                 continue
             if isinstance(m, nn.Conv2d):
                 nn.init.normal_(m.weight, std=0.001)
-            elif isinstance(m, cfg.MODEL.BNFUNC):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+            #elif isinstance(m, cfg.MODEL.BNFUNC):
+            #    nn.init.constant_(m.weight, 1)
+            #    nn.init.constant_(m.bias, 0)
+        print(pretrained)
         if os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained,
                                          map_location={'cuda:0': 'cpu'})

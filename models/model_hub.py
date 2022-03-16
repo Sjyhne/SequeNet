@@ -2,12 +2,8 @@ import torch
 from .models.simple_unet import UNET
 from .models.ddrnet import DDRNet
 from .models.network.ocrnet import HRNet_Mscale
-#from .models.network.ocrnet import HRNet_Mscale
 import segmentation_models_pytorch as smp
 from torchsummary import summary
-
-def HRNet_Mscale(num_classes, criterion):
-    return MscaleOCR(num_classes, trunk='hrnetv2', criterion=criterion)
 
 ENCODER = "efficientnet-b0"
 ENCODER_WEIGHTS = "imagenet"
