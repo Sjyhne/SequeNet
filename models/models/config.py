@@ -47,7 +47,7 @@ cfg = __C
 __C.GLOBAL_RANK = 0
 __C.EPOCH = 0
 # Absolute path to a location to keep some large files, not in this dir.
-__C.ASSETS_PATH = '/home/jorgej17/SequeNet/models/models/pretrainedweights'
+__C.ASSETS_PATH = '/home/jorgej17/SequeNet/models/models/pretrainedweights/hrnetv2_w48_imagenet_pretrained.pth'
 
 # Use class weighted loss per batch to increase loss for low pixel count classes per batch
 __C.BATCH_WEIGHTING = False
@@ -94,7 +94,7 @@ __C.DATASET.CITYSCAPES_SPLITS = 3
 __C.DATASET.MEAN = [0.485, 0.456, 0.406]
 __C.DATASET.STD = [0.229, 0.224, 0.225]
 __C.DATASET.NAME = ''
-__C.DATASET.NUM_CLASSES = 1
+__C.DATASET.NUM_CLASSES = 2
 __C.DATASET.IGNORE_LABEL = 255
 __C.DATASET.DUMP_IMAGES = False
 __C.DATASET.CLASS_UNIFORM_PCT = 0.5
