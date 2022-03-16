@@ -41,10 +41,10 @@ def get_model(args):
             in_channels=args.num_channels,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=args.num_classes,
         )
-    elif model == "ddrnet":
+    elif args.model == "ddrnet":
         return DDRNet(num_classes=args.num_classes)
-    elif model == "mscale":
-        return HRNet_Mscale(num_classes=args.num_classes)
+    elif args.model == "mscale":
+        return HRNet_Mscale(num_classes=args.num_classes, criterion=None)
         
     #elif model == "mscale":
     #    return HRNet_Mscale(2)

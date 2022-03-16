@@ -39,7 +39,7 @@ def display_and_store_metrics(train, eval, args):
     print("Train biou: %.4f | Val biou: %.4f" % (float(train["biou"]), float(eval["biou"])))
     print()
     
-    store_path = os.path.join("model_output", f"{args.training_mode}_{args.model}")
+    store_path = args.output_path
     
     if not os.path.exists(store_path):
         os.makedirs(store_path)
@@ -113,7 +113,7 @@ def calc_biou(pred_imgs, anns):
 
 def save_best_model(model, loss_value, best_loss_value, epoch, args):
     if best_loss_value == None or loss_value < best_loss_value:
-        path = os.path.join("model_output", f"{args.training_mode}_{args.model}")
+        path = args.output_path
         for file in os.listdir(path):
             if "best_model" in file:
                 os.remove(os.path.join(path, file))
