@@ -111,11 +111,16 @@ def calc_biou(pred_imgs, anns):
     
     return np.mean(biou)
 
-def save_best_model(model, loss_value, best_loss_value, epoch, args):
+def save_best_model(model, optim, loss_value, best_loss_value, epoch, args):
     if best_loss_value == None or loss_value < best_loss_value:
         path = args.output_path
-        save_path = os.path.join(path, f"{args.model}_best_model_{epoch}.pt")
-        torch.save(model.state_dict(), save_path)
+        save_path = os.path.join(path, f"{args.model}_best_model_{epoch}.tar")
+        torch.save({
+            "model": model.state_dict(),
+            "optimizer": optim.state_dict(),
+            "epoch": epoch,
+            "loss": loss_value,
+        }, save_path)
         return loss_value
     else:
         return best_loss_value

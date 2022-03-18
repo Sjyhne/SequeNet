@@ -41,6 +41,9 @@ def train_step(model, batch, loss_fn, optim, args, save=False):
         loss = loss_fn(logits, labs)
     loss.backward()
     optim.step()
+    
+    logits = logits.detach()
+    
     acc, miou, biou = compute_metrics(logits, labs)
 
     return {"loss": loss.item(), "miou": miou, "biou": biou, "acc": acc, "logits": logits}
@@ -56,6 +59,8 @@ def eval_step(model, batch, loss_fn, args):
         loss = loss_fn(logits, labs, batch["dist_map"].to(args.device))
     else:
         loss = loss_fn(logits, labs)
+    
+    logits = logits.detach()
     acc, miou, biou = compute_metrics(logits, labs)
 
     return {"loss": loss.item(), "miou": miou, "biou": biou, "acc": acc, "logits": logits}
@@ -92,6 +97,13 @@ def train(args, train_ds, val_ds):
     optim = get_optim(args.optim)(model.parameters(), lr=args.lr)
     loss_fn = get_loss(args)
     
+    if args.load_from != None:
+        try:
+            model.load_state_dict(torch.load(args.load_from))
+            print("Successfully loaded model from state dict:", args.load_from)
+        except Exception as e:
+            print(e)
+
     best_loss_value = None
 
     print("-----------------------------------------")
@@ -129,8 +141,6 @@ def train(args, train_ds, val_ds):
             if step == len(train_ds) - 1:
                 store_images(os.path.join(output_path, "train", str(epoch + 1)), batch, res["logits"])
             
-            del batch
-
         for key in train_metrics.keys():
             train_metrics[key] = np.mean(train_metrics[key])
 
@@ -141,8 +151,6 @@ def train(args, train_ds, val_ds):
             if step == len(val_ds) - 1:
                 store_images(os.path.join(output_path, "val", str(epoch + 1)), batch, res["logits"])
             
-            del batch
-
         for key in eval_metrics.keys():
             eval_metrics[key] = np.mean(eval_metrics[key])
 
@@ -152,7 +160,7 @@ def train(args, train_ds, val_ds):
 
         display_and_store_metrics(train_metrics, eval_metrics, args)
 
-        best_loss_value = save_best_model(model, round(eval_metrics["loss"], 6), best_loss_value, epoch + 1, args)
+        best_loss_value = save_best_model(model, optim, round(eval_metrics["loss"], 6), best_loss_value, epoch + 1, args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add custom arguments for the training of the model(s)")
@@ -172,6 +180,7 @@ if __name__ == "__main__":
     parser.add_argument("--optim", type=str, default="adam", help="Which optimizer to be used for the training")
     parser.add_argument("--device", type=str, default="cuda:0", help="What type of device to be used for training")
     parser.add_argument("--abl_weight", type=float, default=1.0, help="What the loss value of the abl should should be weighted with")
+    parser.add_argument("--load_from", type=str, default=None, help="Path to .pt file so that we can load a pretrained version of the model")
     
     args = parser.parse_args()
 
