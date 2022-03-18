@@ -65,6 +65,8 @@ def train(args, train_ds, val_ds):
 
     output_path = os.path.join("model_output", args.training_mode + "_" + args.model + "_e" + str(args.epochs) + "_" + str(args.image_dim) + "_" + args.loss)
     print("Output path:", output_path)
+    
+    args.output_path = output_path
 
     if os.path.exists(output_path):
         ans = None

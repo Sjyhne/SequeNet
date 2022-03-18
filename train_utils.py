@@ -114,9 +114,6 @@ def calc_biou(pred_imgs, anns):
 def save_best_model(model, loss_value, best_loss_value, epoch, args):
     if best_loss_value == None or loss_value < best_loss_value:
         path = args.output_path
-        for file in os.listdir(path):
-            if "best_model" in file:
-                os.remove(os.path.join(path, file))
         save_path = os.path.join(path, f"{args.model}_best_model_{epoch}.pt")
         torch.save(model.state_dict(), save_path)
         return loss_value
