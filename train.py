@@ -132,7 +132,6 @@ def train(args, train_ds, val_ds):
 
         model.train()
         for step, batch in tqdm(enumerate(train_ds), total=len(train_ds), leave=False):
-            # res: {"loss": loss.item(), "logits": logits}
             if step == len(train_ds) - 1:
                 res = train_step(model, batch, loss_fn, optim, args, save=True)
             else:
@@ -187,7 +186,7 @@ if __name__ == "__main__":
     if args.image_dim == 224:
         args.data_path = "data/large_building_area_224"
     elif args.image_dim == 512:
-        args.data_path = "data/large_building_area"
+        args.data_path = "data/primary_deeplab_e20_512_rmi_large_building_area"
 
     
     print("Args:", args)

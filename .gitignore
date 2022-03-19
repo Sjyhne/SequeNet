@@ -133,3 +133,4 @@ logs
 *.pyc
 model_output
 models/models/pretrainedweights
+models/models/convnext_base_1k_224_ema.pth

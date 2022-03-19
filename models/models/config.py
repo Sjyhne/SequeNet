@@ -47,7 +47,7 @@ cfg = __C
 __C.GLOBAL_RANK = 0
 __C.EPOCH = 0
 # Absolute path to a location to keep some large files, not in this dir.
-__C.ASSETS_PATH = '/home/sandej17/SequeNet/models/models/pretrainedweights/hrnetv2_w48_imagenet_pretrained.pth'
+__C.ASSETS_PATH = '/home/jorgej17/SequeNet/models/models/pretrainedweights/hrnetv2_w48_imagenet_pretrained.pth'
 
 # Use class weighted loss per batch to increase loss for low pixel count classes per batch
 __C.BATCH_WEIGHTING = False

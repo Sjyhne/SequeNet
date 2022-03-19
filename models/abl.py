@@ -178,19 +178,19 @@ class ABL(nn.Module):
 
     def forward(self, logits, target, dist_maps, save=False):
         
-        ph, pw = logits.size(2), logits.size(3)
-        h, w = target.size(1), target.size(2)
+        #ph, pw = logits.size(2), logits.size(3)
+        #h, w = target.size(1), target.size(2)
         
-        if ph != h or pw != w:
-            print("interpolated")
-            logits = F.interpolate(input=logits, size=(
-                h, w), mode='bilinear', align_corners=True)
+        #if ph != h or pw != w:
+        #    print("interpolated")
+        #    logits = F.interpolate(input=logits, size=(
+        #        h, w), mode='bilinear', align_corners=True)
 
-        gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
+        #gt_boundary = self.gt2boundary(target, ignore_label=self.ignore_label)
 
-        dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
+        #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
 
-        pred_boundary = self.logits2boundary(logits, gt_boundary)
+        pred_boundary = self.logits2boundary(logits, dist_maps)
         
         if save:
             plt.imshow(pred_boundary[0].cpu().numpy())
