@@ -180,13 +180,16 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda:0", help="What type of device to be used for training")
     parser.add_argument("--abl_weight", type=float, default=1.0, help="What the loss value of the abl should should be weighted with")
     parser.add_argument("--load_from", type=str, default=None, help="Path to .pt file so that we can load a pretrained version of the model")
+    parser.add_argument("--data_path", type=str)
     
     args = parser.parse_args()
 
-    if args.image_dim == 224:
-        args.data_path = "data/large_building_area_224"
-    elif args.image_dim == 512:
-        args.data_path = "data/primary_deeplab_e20_512_rmi_large_building_area"
+
+    if args.training_mode != "secondary":
+        if args.image_dim == 224:
+            args.data_path = "data/large_building_area_224"
+        elif args.image_dim == 512:
+            args.data_path = "data/primary_deeplab_e20_512_rmi_large_building_area"
 
     
     print("Args:", args)
