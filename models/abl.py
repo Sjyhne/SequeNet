@@ -69,7 +69,7 @@ class ABL(nn.Module):
     def logits2boundary(self, logit, gt_boundary):
         n, _, h, w = logit.shape
         eps = torch.full((n,), 1e-3)
-        batch_max_N = gt_boundary.sum((1, 2)) * 0.75
+        batch_max_N = torch.where(gt_boundary == 0, 1, 0).sum((1, 2)) / 3 * 0.9
         kl_lr = kl_div(logit[:, :, 1:, :], logit[:, :, :-1, :]).sum(1, keepdim=True)
         kl_ud = kl_div(logit[:, :, :, 1:], logit[:, :, :, :-1]).sum(1, keepdim=True)
         kl_lr = torch.nn.functional.pad(kl_lr, [0, 0, 0, 1, 0, 0, 0, 0], mode='constant', value=0)
@@ -194,11 +194,9 @@ class ABL(nn.Module):
         
         if save:
             plt.imshow(pred_boundary[0].cpu().numpy())
-            plt.savefig("pred_boundary.png", dpi=150)
-            plt.imshow(gt_boundary[0].cpu().numpy())
-            plt.savefig("gt_boundary.png", dpi=150)
+            plt.savefig(f"pred_boundary_{0}.png", dpi=150)
             plt.imshow(dist_maps[0].cpu().numpy())
-            plt.savefig("dist_maps.png", dpi=150)
+            plt.savefig(f"dist_maps_{0}.png", dpi=150)
         
         save = False
         
