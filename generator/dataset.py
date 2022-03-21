@@ -6,14 +6,14 @@ import random
 import os
 
 class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, image_paths, bsize, img_size, data_percentage=1.0) -> None:
+    def __init__(self, image_paths, bsize, img_size, data_percentage=1.0, four_channels=False) -> None:
         self.image_paths = image_paths
         random.shuffle(self.image_paths)
         self.image_paths = self.image_paths[:int(len(self.image_paths) * data_percentage)]
         self.label_paths = self.get_label_paths()
-        #self.bsize = bsize
         self.img_size = img_size
-    
+        self.four_channels = four_channels
+        
         #self.image_batches, self.label_batches = self.generate_batches()
     
     def get_label_path(self, path):
@@ -63,8 +63,11 @@ class ImageDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
         label_path = self.label_paths[idx]
-        img = cv.imread(image_path, cv.IMREAD_COLOR)
-        lab = cv.imread(label_path, cv.IMREAD_GRAYSCALE)
+        if not self.four_channels:
+            img = cv.imread(image_path, cv.IMREAD_COLOR)
+        else:
+            img = np.load(image_path)
+        lab = cv.imread(label_path.replace(".npy", ".png"), cv.IMREAD_GRAYSCALE)
         #lab = lab.reshape(self.img_size[0], self.img_size[1], 1)
         if lab[0, 0] > 1:
             lab[lab == 30] = 0
@@ -77,7 +80,10 @@ class ImageDataset(torch.utils.data.Dataset):
             print(e)
             dist_map = []
         
-        tensor_img = torch.tensor(img/255, dtype=torch.float32)
+        if not self.four_channels:
+            tensor_img = torch.tensor(img/255, dtype=torch.float32)
+        else:
+            tensor_img = torch.tensor(img, dtype=torch.float32)
         tensor_lab = torch.tensor(lab, dtype=torch.int64)
         dist_map = torch.tensor(dist_map, dtype=torch.float32)
         """

@@ -72,9 +72,15 @@ if __name__ == "__main__":
     val_ds = torch.utils.data.DataLoader(create_dataset_generator(original_datapath, "val", data_percentage=1.0), shuffle=False, batch_size=args.bs)
     test_ds = torch.utils.data.DataLoader(create_dataset_generator(original_datapath, "test", data_percentage=1.0), shuffle=False, batch_size=args.bs)
     
-    new_datapath = os.path.join("data", args.model_folder + "_" + args.dn)
-    if os.path.exists(new_datapath):
-        shutil.rmtree(new_datapath)
+    
+    if args.four_channels:
+        new_datapath = os.path.join("data", args.model_folder + "_" + args.dn + "_four_channels")
+        if os.path.exists(new_datapath):
+            shutil.rmtree(new_datapath)
+    else:
+        new_datapath = os.path.join("data", args.model_folder + "_" + args.dn)
+        if os.path.exists(new_datapath):
+            shutil.rmtree(new_datapath)
     
     os.makedirs(new_datapath)
     
@@ -139,7 +145,7 @@ if __name__ == "__main__":
     else:
         for i, d in enumerate(data):
             for step, batch in tqdm(enumerate(d), total=len(d)):
-                                img_dir = os.path.join(new_datapath, types[i], "img_dir")
+                img_dir = os.path.join(new_datapath, types[i], "img_dir")
                 ann_dir = os.path.join(new_datapath, types[i], "ann_dir")
                 mask_dir = os.path.join(new_datapath, types[i], "mask_dir")
                 grad_dir = os.path.join(new_datapath, types[i], "grad_dir")
@@ -151,13 +157,15 @@ if __name__ == "__main__":
                 labels = batch["lab"].to(args.device).cpu().numpy()
 
                 predictions = torch.nn.functional.softmax(model(imgs), dim=1).cpu().detach()
-                
 
                 predicted_masks = torch.argmax(predictions, dim=1).cpu().detach().numpy()
+                
+                predictions = predictions.numpy()
+                
                 for it, pm in enumerate(predicted_masks):
                     plt.imsave(mask_dir + "/" + names[it] + ".png", pm)
 
-                gradients = predictions[:, 1, :, :].numpy()
+                gradients = predictions[:, 1, :, :]
                 for it, grad in enumerate(gradients):
                     plt.imsave(grad_dir + "/" + names[it] + ".png", grad)
 
@@ -165,6 +173,11 @@ if __name__ == "__main__":
                     plt.imsave(ann_dir + "/" + names[it] + ".png", ann)
                     np.save(ann_dir + "/" + names[it] + ".npy", dist_map[i])
                     
-                print(imgs)
+                predictions = predictions[:, 1, :, :]
                 
-                exit()
+                predictions = np.clip(np.expand_dims(predictions, axis=-1), 0.2, 1.0)
+                
+                new = np.concatenate((orig_imgs/255, predictions), axis=-1)
+                for it, n in enumerate(new):
+                    np.save(img_dir + "/" + names[it] + ".npy", np.float16(n))
+                

@@ -311,5 +311,5 @@ def HRNet(num_classes, criterion):
 
 def HRNet_Mscale(num_classes, criterion):
     model =  MScale(num_classes, trunk='hrnetv2', criterion=criterion)
-    model.backbone.init_weights(cfg.ASSETS_PATH)
+    #model.backbone.init_weights(cfg.ASSETS_PATH)
     return model

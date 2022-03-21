@@ -14,7 +14,7 @@ class ModelClass(torch.nn.Module):
     def __init__(self):
         print("Replace me with the correct model class!")
 
-def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512, 512), data_percentage=1.0, create_dist=False):
+def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512, 512), data_percentage=1.0, create_dist=False, four_channels=False):
     
     heigth, width = image_size
 
@@ -22,7 +22,7 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
     
     print(data_dir)
 
-    img_paths = [os.path.join(data_dir, file) for file in os.listdir(data_dir) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
+    img_paths = [os.path.join(data_dir, file) for file in os.listdir(data_dir) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif', '.npy'))]
     
     print(len(img_paths))
     
@@ -30,7 +30,7 @@ def create_dataset_generator(datapath, datatype, batch_size=16, image_size=(512,
         print(os.path.join("/".join(datapath.split("/")[:-1]), "ann_dir", datatype))
         generate_dist_maps(os.path.join("/".join(datapath.split("/")[:-1]), "ann_dir", datatype))
 
-    image_dataset = ImageDataset(img_paths, batch_size, (heigth, width), data_percentage)
+    image_dataset = ImageDataset(img_paths, batch_size, (heigth, width), data_percentage, four_channels=four_channels)
     
     return image_dataset
 

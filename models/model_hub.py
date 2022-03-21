@@ -2,7 +2,7 @@ import torch
 from .models.simple_unet import UNET
 from .models.ddrnet import DDRNet
 from .models.network.ocrnet import HRNet_Mscale
-from .models.convnext_uperhead import convnext_uperhead
+#from .models.convnext_uperhead import convnext_uperhead
 import segmentation_models_pytorch as smp
 from torchsummary import summary
 
@@ -42,8 +42,8 @@ def get_model(args):
         return DDRNet(num_classes=args.num_classes)
     elif args.model == "mscale":
         return HRNet_Mscale(num_classes=args.num_classes, criterion=None)
-    elif args.model == "convnext":
-        return convnext_uperhead(args)
+    #elif args.model == "convnext":
+    #    return convnext_uperhead(args)
         
     #elif model == "mscale":
     #    return HRNet_Mscale(2)

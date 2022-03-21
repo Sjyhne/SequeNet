@@ -181,6 +181,7 @@ if __name__ == "__main__":
     parser.add_argument("--abl_weight", type=float, default=1.0, help="What the loss value of the abl should should be weighted with")
     parser.add_argument("--load_from", type=str, default=None, help="Path to .pt file so that we can load a pretrained version of the model")
     parser.add_argument("--data_path", type=str)
+    parser.add_argument("--four_channels", type=bool, default=False)
     
     args = parser.parse_args()
 
@@ -189,15 +190,15 @@ if __name__ == "__main__":
         if args.image_dim == 224:
             args.data_path = "data/large_building_area_224"
         elif args.image_dim == 512:
-            args.data_path = "data/primary_deeplab_e20_512_rmi_large_building_area"
+            args.data_path = "data/primary_deeplab_e20_512_rmi_large_building_area_four_channels"
 
     
     print("Args:", args)
 
     if args.dataset == "lba":
-        train_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage), shuffle=True, batch_size=args.batch_size)
-        val_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage), shuffle=False, batch_size=args.batch_size)
-        test_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage), shuffle=False, batch_size=args.batch_size)
+        train_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "train", batch_size=args.batch_size, data_percentage=args.data_percentage, four_channels=args.four_channels), shuffle=True, batch_size=args.batch_size)
+        val_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "val", batch_size=args.batch_size, data_percentage=args.data_percentage, four_channels=args.four_channels), shuffle=False, batch_size=args.batch_size)
+        test_ds = torch.utils.data.DataLoader(create_dataset_generator(args.data_path, "test", batch_size=args.batch_size, data_percentage=args.data_percentage, four_channels=args.four_channels), shuffle=False, batch_size=args.batch_size)
 
     print("Dataset sizes")
     print("Train:\t", len(train_ds))
