@@ -22,8 +22,18 @@ def compute_metrics(logits, labs):
     miou = iou_pytorch(pred_masks, lab_masks)
     biou = calc_biou(pred_masks, lab_masks)
     acc = ACCURACY(pred_masks, lab_masks)
+    
+    acc = acc.cpu().numpy()
+    miou = miou.cpu().numpy()
+    
+    if acc == np.nan:
+        acc = 1e-6
+    if miou == np.nan:
+        miou = 1e-6
+    if biou == np.nan:
+        biou = 1e-6
 
-    return acc.cpu().numpy(), miou.cpu().numpy(), biou
+    return acc, miou, biou
 
 
 def train_step(model, batch, loss_fn, optim, args, save=False):
