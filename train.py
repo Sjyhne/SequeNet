@@ -195,13 +195,6 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-
-    if args.training_mode != "secondary":
-        if args.image_dim == 224:
-            args.data_path = "data/large_building_area_224"
-        elif args.image_dim == 512:
-            args.data_path = "data/primary_deeplab_e20_512_rmi_large_building_area_four_channels"
-
     
     print("Args:", args)
 

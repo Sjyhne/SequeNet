@@ -127,13 +127,15 @@ def save_best_model(model, optim, loss_value, best_loss_value, epoch, args):
 
 def store_images(path, batch, pred_images):
     anns = batch["lab"]
-    imgs = np.uint8(batch["orig_img"])
+    imgs = batch["orig_img"]
+    if batch["orig_img"].shape[3] > 3:
+        imgs = np.uint8(batch["orig_img"] * 255)
     names = batch["name"]
     os.makedirs(path)
     anns = anns.unsqueeze(-1)
     pred_images = torch.permute(pred_images, (0, 2, 3, 1))
     pred_images = torch.nn.functional.softmax(pred_images, dim=-1).cpu().detach().numpy()
-    highlighted_images = np.uint8((np.float32(imgs) * np.expand_dims(np.clip(pred_images[:, :, :, 1], 0.2, 1.0), axis=-1)))
+    highlighted_images = np.uint8((np.float32(imgs[:, :, :, :3]) * np.expand_dims(np.clip(pred_images[:, :, :, 1], 0.2, 1.0), axis=-1)))
     main_build_gradients = np.expand_dims(pred_images[:, :, :, 1], axis=-1)
     pred_images = np.expand_dims(np.argmax(pred_images, axis=-1), axis=-1)
     for i, pi in enumerate(pred_images[:6]):
@@ -144,7 +146,7 @@ def store_images(path, batch, pred_images):
         fig.add_subplot(gs[1, 0])
         fig.add_subplot(gs[1, 1])
         fig.add_subplot(gs[2, 0])
-        fig.axes[0].imshow(imgs[i])
+        fig.axes[0].imshow(np.uint8(imgs[i][:, :, :3]))
         fig.axes[0].set_title("RGB")
         fig.axes[1].imshow(highlighted_images[i])
         fig.axes[1].set_title("Mask * RGB")

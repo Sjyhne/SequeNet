@@ -2,6 +2,14 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from models import RMILoss, ABL, LabelSmoothSoftmaxCEV1
+
+rmi = RMILoss(num_classes=1)
+abl = ABL()
+lovasz = LabelSmoothSoftmaxCEV1()
+
+DEVICE = "cuda:0"
+
 def bdrloss(prediction, label, radius):
     '''
     The boundary tracing loss that handles the confusing pixels.
@@ -9,7 +17,7 @@ def bdrloss(prediction, label, radius):
 
     filt = torch.ones(1, 1, 2*radius+1, 2*radius+1)
     filt.requires_grad = False
-    filt = filt.cuda()
+    filt = filt.to(DEVICE)
 
     bdr_pred = prediction * label
     pred_bdr_sum = label * F.conv2d(bdr_pred, filt, bias=None, stride=1, padding=radius)
@@ -35,10 +43,10 @@ def textureloss(prediction, label, mask_radius):
     '''
     filt1 = torch.ones(1, 1, 3, 3)
     filt1.requires_grad = False
-    filt1 = filt1.cuda()
+    filt1 = filt1.to(DEVICE)
     filt2 = torch.ones(1, 1, 2*mask_radius+1, 2*mask_radius+1)
     filt2.requires_grad = False
-    filt2 = filt2.cuda()
+    filt2 = filt2.to(DEVICE)
 
     pred_sums = F.conv2d(prediction.float(), filt1, bias=None, stride=1, padding=1)
     label_sums = F.conv2d(label.float(), filt2, bias=None, stride=1, padding=mask_radius)
@@ -51,11 +59,11 @@ def textureloss(prediction, label, mask_radius):
     return torch.sum(loss)
 
 
-def tracingloss(prediction, label, tex_factor=0., bdr_factor=0., balanced_w=1.1):
+def tracingloss(prediction, label, dist_map, tex_factor=0., bdr_factor=0., balanced_w=1.1):
     label = label.float()
     prediction = prediction.float()
     with torch.no_grad():
-        mask = label.clone()
+        mask = label.unsqueeze(1).clone()
 
         num_positive = torch.sum((mask==1).float()).float()
         num_negative = torch.sum((mask==0).float()).float()
@@ -66,10 +74,39 @@ def tracingloss(prediction, label, tex_factor=0., bdr_factor=0., balanced_w=1.1)
 
     #print('bce')
     cost = torch.sum(torch.nn.functional.binary_cross_entropy(
-                prediction.float(),label.float(), weight=mask, reduce=False))
-    label_w = (label != 0).float()
+                torch.sigmoid(prediction).float(),label.unsqueeze(1).float(), weight=mask, reduction="none"))
+    #if len(label.shape) == 4:
+    #    cost = torch.sum(rmi(prediction.float(), label.long().squeeze()))
+    #    lov = lovasz(prediction.float(), label.long().squeeze())
+    #elif len(label.shape) == 3:
+    #    cost = torch.sum(rmi(prediction.float(), label.long()))
+    #    lov = lovasz(prediction.float(), label.long())
+    
+    
+    #pred_max, pred_min = prediction.max(), torch.abs(prediction.min())
+    
+    #difference = pred_max + pred_min
+    
+    #abl_pred = (prediction + pred_min) / difference
+    
+    #print(abl_pred)
+    
+    #print(pred_max, pred_min)
+    
+    #abl_loss = abl(prediction.float(), label.long(), dist_map)
+    
+    #print("abl_loss:", abl_loss)
+    
+    label_w = (label != 0).float().unsqueeze(1)
     #print('tex')
-    textcost = textureloss(prediction.float(),label_w.float(), mask_radius=2)
-    bdrcost = bdrloss(prediction.float(),label_w.float(),radius=2)
-
+    textcost = textureloss(torch.sigmoid(prediction).float(), label_w.float(), mask_radius=2)
+    bdrcost = bdrloss(torch.sigmoid(prediction).float(),label_w.float(),radius=2)
+    
     return cost + bdr_factor*bdrcost + tex_factor*textcost
+    
+    #if abl_loss != None:
+    #    print("ABL!")
+    #    return cost + abl_loss + bdr_factor*bdrcost + tex_factor*textcost
+    #else:
+    #    return cost + bdr_factor*bdrcost + tex_factor*textcost        
+    

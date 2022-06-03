@@ -3,8 +3,11 @@ import cv2 as cv
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from models.model_hub import get_model
 from generator import create_dataset_generator
+from models.models.cats import Network
+from cats_main import Config
+
+from models.abl import gt2boundary
 
 import torch
 
@@ -30,45 +33,21 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Add custom arguments for the training of the model(s)")
     # TODO: This should be revised -- maybe added in a config file or something
-    parser.add_argument("--model_folder", type=str, help="Name of model to datasets for")
-    parser.add_argument("--epoch", type=int, help="Which epoch of the trained models should be used?")
-    parser.add_argument("--model", type=str, help="Name of the model architecture used")
     parser.add_argument("--dn", type=str, help="Path of the dataset up for generation")
     parser.add_argument("--device", type=str, default="cuda:0")
-    parser.add_argument("--bs", type=int, default=32)
+    parser.add_argument("--bs", type=int, default=8)
     parser.add_argument("--num_channels", type=int, default=3, help="Number of channels in the input image")
     parser.add_argument("--num_classes", type=int, default=2, help="Number of classes in the input image")
     parser.add_argument("--image_dim", type=int, default=512, help="Input image dimension")
-    parser.add_argument("--four_channels", type=bool, default=False, help="Whether the gradients should be put as a 4th channel")
+    parser.add_argument("--four_channels", type=bool, default=True, help="Whether the gradients should be put as a 4th channel")
     
     args = parser.parse_args()
     
     print("args:", args)
-
-    model = get_model(args)
-    
-    path = os.path.join("model_output", args.model_folder)
-    
-    state_dict_name = None
-    
-    for file in os.listdir(path):
-        if ".tar" in file and str(args.epoch) in file:
-            state_dict_name = file
-    
-    
-    model_state_path = os.path.join(path, state_dict_name)
-    
-    print("Model state path:", model_state_path)
-    
-    try:
-        model.load_state_dict(torch.load(model_state_path, map_location=args.device)["model"])
-        print("Successfully loaded model from state dict")
-    except Exception as e:
-        print(e)
-        
-    model = model.to(args.device)
     
     original_datapath = os.path.join("data", args.dn)
+    
+    label_path = "data/large_building_area"
     
     train_ds = torch.utils.data.DataLoader(create_dataset_generator(original_datapath, "train", data_percentage=1.0), shuffle=False, batch_size=args.bs)
     val_ds = torch.utils.data.DataLoader(create_dataset_generator(original_datapath, "val", data_percentage=1.0), shuffle=False, batch_size=args.bs)
@@ -76,11 +55,11 @@ if __name__ == "__main__":
     
     
     if args.four_channels:
-        new_datapath = os.path.join("data", args.model_folder + "_" + args.dn + "_four_channels_v2")
+        new_datapath = os.path.join("data", "perfect_edge_dataset" + "_" + args.dn)
         if os.path.exists(new_datapath):
             shutil.rmtree(new_datapath)
     else:
-        new_datapath = os.path.join("data", args.model_folder + "_" + args.dn)
+        new_datapath = os.path.join("data", "perfect_edge_dataset" + "_" + args.dn)
         if os.path.exists(new_datapath):
             shutil.rmtree(new_datapath)
     
@@ -112,27 +91,32 @@ if __name__ == "__main__":
                 imgs = batch["img"].to(args.device).permute(0, 3, 1, 2)
                 labels = batch["lab"].to(args.device).cpu().numpy()
 
-                predictions = torch.nn.functional.softmax(model(imgs), dim=1).cpu().detach()
-
-                predicted_masks = torch.argmax(predictions, dim=1).cpu().detach().numpy()
+                lpaths = [os.path.join(label_path, types[i], "ann_dir", n + ".tiff") for n in names]
+                
+                predictions = np.asarray([cv.imread(lp, cv.IMREAD_GRAYSCALE) for lp in lpaths])
+                
+                predicted_masks = gt2boundary(torch.tensor(predictions))
+                
                 for it, pm in enumerate(predicted_masks):
                     plt.imsave(mask_dir + "/" + names[it] + ".png", pm)
 
-                gradients = predictions[:, 1, :, :].numpy()
+                gradients = predicted_masks.numpy()
                 for it, grad in enumerate(gradients):
                     plt.imsave(grad_dir + "/" + names[it] + ".png", grad)
 
                 for it, ann in enumerate(labels):
                     plt.imsave(ann_dir + "/" + names[it] + ".png", ann)
-                    np.save(ann_dir + "/" + names[it] + ".npy", dist_map[it])
+                    np.save(ann_dir + "/" + names[it] + ".npy", dist_map[i])
 
-                dilated_masks = dilate_masks(predicted_masks, (15, 15))
-                dilation_grads = np.clip(gradients + 0.8, 0.0, 1.0)
-                gradient_masks = np.clip(np.expand_dims(dilated_masks * dilation_grads, axis=-1), 0.5, 1.0)
+                dilated_masks = dilate_masks(predicted_masks, (8, 8))
+                dilation_grads = np.clip(gradients + 0.7, 0.0, 1.0)
+                gradient_masks = np.clip(np.expand_dims(dilated_masks * dilation_grads, axis=-1), 0.2, 1.0)
                 gradient_imgs = np.uint8(orig_imgs * gradient_masks)
 
                 for it, im in enumerate(gradient_imgs):
                     plt.imsave(img_dir + "/" + names[it] + ".png", im)
+                    
+                exit()
                 """    
                 plt.imsave(f"{names[0]}_distmap.png", dist_map[0])
                 plt.imsave(f"{names[0]}_label.png", labels[0])
@@ -157,29 +141,27 @@ if __name__ == "__main__":
                 orig_imgs = batch["orig_img"].cpu().numpy()
                 imgs = batch["img"].to(args.device).permute(0, 3, 1, 2)
                 labels = batch["lab"].to(args.device).cpu().numpy()
-
-                predictions = torch.nn.functional.softmax(model(imgs), dim=1).cpu().detach()
-
-                predicted_masks = torch.argmax(predictions, dim=1).cpu().detach().numpy()
                 
-                predictions = predictions.numpy()
-                
-                for it, pm in enumerate(predicted_masks):
-                    plt.imsave(mask_dir + "/" + names[it] + ".png", pm)
+                lpaths = [os.path.join(label_path, types[i], "edge_dir", n + ".png") for n in names]
 
-                gradients = predictions[:, 1, :, :]
-                for it, grad in enumerate(gradients):
-                    plt.imsave(grad_dir + "/" + names[it] + ".png", grad)
-
-                for it, ann in enumerate(labels):
-                    plt.imsave(ann_dir + "/" + names[it] + ".png", ann)
-                    np.save(ann_dir + "/" + names[it] + ".npy", dist_map[i])
-                    
-                predictions = predictions[:, 1, :, :]
+                predictions = np.asarray([cv.imread(lp, cv.IMREAD_GRAYSCALE) for lp in lpaths])
                 
-                predictions = np.clip(np.expand_dims(predictions, axis=-1), 0.0, 1.0)
+                predicted_masks = gt2boundary(torch.tensor(predictions))
                 
-                new = np.concatenate((orig_imgs/255, predictions), axis=-1)
+                dilated_masks = dilate_masks(predicted_masks, (8, 8))
+                
+                dilated_masks = np.expand_dims(dilated_masks, axis=-1)
+                
+                predictions[predictions == 30] = 0.0
+                predictions[predictions == 215] = 1.0
+                
+                predictions = np.clip(predictions, 0.5, 1.0)
+                
+                predictions = np.expand_dims(predictions, axis=-1)
+                
+                new = (orig_imgs/255) * predictions
+                
+                #new = np.concatenate((orig_imgs/255, dilated_masks), axis=-1)
                 for it, n in enumerate(new):
-                    np.save(img_dir + "/" + names[it] + ".npy", np.float16(n))
+                    plt.imsave(img_dir + "/" + names[it] + ".png", np.uint8(n * 255))
                 

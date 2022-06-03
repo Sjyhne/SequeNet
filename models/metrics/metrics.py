@@ -40,7 +40,10 @@ def boundary_iou(gt, dt, dilation_ratio=0.02):
     dt_boundary = mask_to_boundary(dt, dilation_ratio)
     intersection = ((gt_boundary * dt_boundary) > 0).sum()
     union = ((gt_boundary + dt_boundary) > 0).sum()
-    boundary_iou = (intersection / union) + 1e-6
+    if intersection == 0 or union == 0:
+        boundary_iou = 1e-6
+    else:
+        boundary_iou = (intersection / union) + 1e-6
     return boundary_iou
 
 

@@ -258,12 +258,12 @@ blocks_dict = {
 
 class HighResolutionNet(nn.Module):
 
-    def __init__(self, **kwargs):
+    def __init__(self, in_channels=3, **kwargs):
         extra = cfg.MODEL.OCR_EXTRA
         super(HighResolutionNet, self).__init__()
 
         # stem net
-        self.conv1 = nn.Conv2d(4, 64, kernel_size=3, stride=2, padding=1,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1,
@@ -473,8 +473,8 @@ class HighResolutionNet(nn.Module):
             raise RuntimeError('No such file {}'.format(pretrained))
 
 
-def get_seg_model():
-    model = HighResolutionNet()
+def get_seg_model(in_channels=4):
+    model = HighResolutionNet(in_channels=in_channels)
     #model.init_weights()
 
     return model

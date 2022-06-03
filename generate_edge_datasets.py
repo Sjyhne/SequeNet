@@ -3,8 +3,9 @@ import cv2 as cv
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from models.model_hub import get_model
 from generator import create_dataset_generator
+from models.models.cats import Network
+from cats_main import Config
 
 import torch
 
@@ -12,61 +13,38 @@ import argparse
 import os
 import shutil
 
-def dilate_masks(masks, dilation=(10, 10)):
-    
-    dilation = np.ones((dilation))
-    
-    dilated_masks = np.ndarray(masks.shape)
-    
-    masks = np.uint8(masks)
-    
-    for i, mask in enumerate(masks):
-        mask = cv.dilate(mask, dilation)
-        dilated_masks[i] = mask
-    
-    return dilated_masks
-
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Add custom arguments for the training of the model(s)")
     # TODO: This should be revised -- maybe added in a config file or something
-    parser.add_argument("--model_folder", type=str, help="Name of model to datasets for")
+    parser.add_argument("--cp", type=str, help="Path for checkpoint to be used")
     parser.add_argument("--epoch", type=int, help="Which epoch of the trained models should be used?")
-    parser.add_argument("--model", type=str, help="Name of the model architecture used")
     parser.add_argument("--dn", type=str, help="Path of the dataset up for generation")
     parser.add_argument("--device", type=str, default="cuda:0")
-    parser.add_argument("--bs", type=int, default=32)
+    parser.add_argument("--bs", type=int, default=8)
     parser.add_argument("--num_channels", type=int, default=3, help="Number of channels in the input image")
     parser.add_argument("--num_classes", type=int, default=2, help="Number of classes in the input image")
     parser.add_argument("--image_dim", type=int, default=512, help="Input image dimension")
-    parser.add_argument("--four_channels", type=bool, default=False, help="Whether the gradients should be put as a 4th channel")
+    parser.add_argument("--four_channels", type=bool, default=True, help="Whether the gradients should be put as a 4th channel")
     
     args = parser.parse_args()
     
     print("args:", args)
+    
+    cfg = Config()
+    
+    cfg.resume = args.cp
 
-    model = get_model(args)
-    
-    path = os.path.join("model_output", args.model_folder)
-    
-    state_dict_name = None
-    
-    for file in os.listdir(path):
-        if ".tar" in file and str(args.epoch) in file:
-            state_dict_name = file
-    
-    
-    model_state_path = os.path.join(path, state_dict_name)
-    
-    print("Model state path:", model_state_path)
-    
-    try:
-        model.load_state_dict(torch.load(model_state_path, map_location=args.device)["model"])
-        print("Successfully loaded model from state dict")
-    except Exception as e:
-        print(e)
-        
-    model = model.to(args.device)
+    # model
+    model = Network(cfg)
+    print('=> Load model')
+
+    model.to("cuda:0")
+    print('=> Cuda used')
+             
+    model.load_checkpoint()
+             
+    print("Model successfully loaded")
     
     original_datapath = os.path.join("data", args.dn)
     
@@ -76,7 +54,7 @@ if __name__ == "__main__":
     
     
     if args.four_channels:
-        new_datapath = os.path.join("data", args.model_folder + "_" + args.dn + "_four_channels_v2")
+        new_datapath = os.path.join("data", "data_edge_model_four_channels" + "_" + args.dn)
         if os.path.exists(new_datapath):
             shutil.rmtree(new_datapath)
     else:
@@ -124,11 +102,11 @@ if __name__ == "__main__":
 
                 for it, ann in enumerate(labels):
                     plt.imsave(ann_dir + "/" + names[it] + ".png", ann)
-                    np.save(ann_dir + "/" + names[it] + ".npy", dist_map[it])
+                    np.save(ann_dir + "/" + names[it] + ".npy", dist_map[i])
 
                 dilated_masks = dilate_masks(predicted_masks, (15, 15))
-                dilation_grads = np.clip(gradients + 0.8, 0.0, 1.0)
-                gradient_masks = np.clip(np.expand_dims(dilated_masks * dilation_grads, axis=-1), 0.5, 1.0)
+                dilation_grads = np.clip(gradients + 0.3, 0.0, 1.0)
+                gradient_masks = np.clip(np.expand_dims(dilated_masks * dilation_grads, axis=-1), 0.15, 1.0)
                 gradient_imgs = np.uint8(orig_imgs * gradient_masks)
 
                 for it, im in enumerate(gradient_imgs):
@@ -158,28 +136,17 @@ if __name__ == "__main__":
                 imgs = batch["img"].to(args.device).permute(0, 3, 1, 2)
                 labels = batch["lab"].to(args.device).cpu().numpy()
 
-                predictions = torch.nn.functional.softmax(model(imgs), dim=1).cpu().detach()
-
-                predicted_masks = torch.argmax(predictions, dim=1).cpu().detach().numpy()
+                predictions = torch.sigmoid(model(imgs)[-1]).cpu().detach()
                 
                 predictions = predictions.numpy()
-                
-                for it, pm in enumerate(predicted_masks):
-                    plt.imsave(mask_dir + "/" + names[it] + ".png", pm)
 
-                gradients = predictions[:, 1, :, :]
-                for it, grad in enumerate(gradients):
-                    plt.imsave(grad_dir + "/" + names[it] + ".png", grad)
-
-                for it, ann in enumerate(labels):
-                    plt.imsave(ann_dir + "/" + names[it] + ".png", ann)
-                    np.save(ann_dir + "/" + names[it] + ".npy", dist_map[i])
-                    
-                predictions = predictions[:, 1, :, :]
+                predictions = np.transpose(predictions, (0, 2, 3, 1))
                 
-                predictions = np.clip(np.expand_dims(predictions, axis=-1), 0.0, 1.0)
+                predictions[predictions <= 0.5] = 0.5
                 
-                new = np.concatenate((orig_imgs/255, predictions), axis=-1)
+                new = (orig_imgs/255) * predictions 
+                
+                #new = np.concatenate((orig_imgs/255, predictions), axis=-1)
                 for it, n in enumerate(new):
                     np.save(img_dir + "/" + names[it] + ".npy", np.float16(n))
                 

@@ -84,6 +84,8 @@ class Optimizer():
                 {'params': net_parameters_id['attn.weight']  , 'lr': self.cfg.lr*1., 'weight_decay': self.cfg.wd},
                 {'params': net_parameters_id['attn.bias']    , 'lr': self.cfg.lr*2., 'weight_decay': 0.},
             ], lr=self.cfg.lr, momentum=self.cfg.momentum, weight_decay=self.cfg.wd)
+        
+        optim = torch.optim.Adam(net.parameters(), lr=self.cfg.lr)
 
         scheduler = lr_scheduler.StepLR(optim, step_size=self.cfg.stepsize, gamma=self.cfg.gamma)
 

@@ -68,7 +68,7 @@ class ABL(nn.Module):
 
     def logits2boundary(self, logit, gt_boundary):
         n, _, h, w = logit.shape
-        eps = torch.full((n,), 1e-3)
+        eps = torch.full((n,), 1e-4)
         batch_max_N = torch.where(gt_boundary == 0, 1, 0).sum((1, 2)) / 3 * 0.9
         kl_lr = kl_div(logit[:, :, 1:, :], logit[:, :, :-1, :]).sum(1, keepdim=True)
         kl_ud = kl_div(logit[:, :, :, 1:], logit[:, :, :, :-1]).sum(1, keepdim=True)
@@ -81,7 +81,7 @@ class ABL(nn.Module):
             while True: # avoid the case that full image is the same colo
                 kl_combine_bin[idx] = (kl_combine[idx] > eps[idx]).to(torch.float32)
                 if kl_combine_bin[idx].sum() > batch_max_N[idx]:
-                    eps[idx] = eps[idx] * 1.1
+                    eps[idx] = eps[idx] * 1.5
                 else:
                     break
                     
@@ -191,7 +191,6 @@ class ABL(nn.Module):
         #dist_maps = self.get_dist_maps(gt_boundary).cuda() # <-- it will slow down the training, you can put it to dataloader.
 
         pred_boundary = self.logits2boundary(logits, dist_maps)
-        
         if save:
             plt.imshow(pred_boundary[0].cpu().numpy())
             plt.savefig(f"pred_boundary_{0}.png", dpi=150)

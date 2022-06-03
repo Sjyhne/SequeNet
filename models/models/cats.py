@@ -9,21 +9,27 @@ import numpy as np
 import torch.nn.functional as F
 from os.path import isfile
 
+from .cats_loss import DEVICE
+
+MULT = 1
 
 class CoFusion(nn.Module):
 
     def __init__(self, in_ch, out_ch):
         super(CoFusion, self).__init__()
-        self.conv1 = nn.Conv2d(in_ch, 64, kernel_size=3,
+        
+        self.mult = MULT
+        
+        self.conv1 = nn.Conv2d(in_ch, 64 * self.mult, kernel_size=3,
             stride=1, padding=1)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3,
+        self.conv2 = nn.Conv2d(64 * self.mult, 64 * self.mult, kernel_size=3,
             stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, out_ch, kernel_size=3,
+        self.conv3 = nn.Conv2d(64 * self.mult, out_ch, kernel_size=3,
             stride=1, padding=1)
         self.relu = nn.ReLU()
 
-        self.norm_layer1 = nn.GroupNorm(4, 64)
-        self.norm_layer2 = nn.GroupNorm(4, 64)
+        self.norm_layer1 = nn.GroupNorm(4, 64 * self.mult)
+        self.norm_layer2 = nn.GroupNorm(4, 64 * self.mult)
 
 
     def forward(self, x):
@@ -41,26 +47,28 @@ class Network(nn.Module):
     def __init__(self, cfg):
         super(Network, self).__init__()
         self.cfg = cfg
+        
+        self.mult = MULT
 
-        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=1)
-        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv1_1 = nn.Conv2d(3, 64 * self.mult, 3, padding=1)
+        self.conv1_2 = nn.Conv2d(64 * self.mult, 64 * self.mult, 3, padding=1)
 
-        self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1)
-        self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1)
+        self.conv2_1 = nn.Conv2d(64 * self.mult, 128 * self.mult, 3, padding=1)
+        self.conv2_2 = nn.Conv2d(128 * self.mult, 128 * self.mult, 3, padding=1)
 
-        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1)
-        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1)
-        self.conv3_3 = nn.Conv2d(256, 256, 3, padding=1)
+        self.conv3_1 = nn.Conv2d(128 * self.mult, 256 * self.mult, 3, padding=1)
+        self.conv3_2 = nn.Conv2d(256 * self.mult, 256 * self.mult, 3, padding=1)
+        self.conv3_3 = nn.Conv2d(256 * self.mult, 256 * self.mult, 3, padding=1)
 
-        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1)
-        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.conv4_3 = nn.Conv2d(512, 512, 3, padding=1)
+        self.conv4_1 = nn.Conv2d(256 * self.mult, 512 * self.mult, 3, padding=1)
+        self.conv4_2 = nn.Conv2d(512 * self.mult, 512 * self.mult, 3, padding=1)
+        self.conv4_3 = nn.Conv2d(512 * self.mult, 512 * self.mult, 3, padding=1)
 
-        self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3,
+        self.conv5_1 = nn.Conv2d(512 * self.mult, 512 * self.mult, kernel_size=3,
                         stride=1, padding=2, dilation=2)
-        self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3,
+        self.conv5_2 = nn.Conv2d(512 * self.mult, 512 * self.mult, kernel_size=3,
                         stride=1, padding=2, dilation=2)
-        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3,
+        self.conv5_3 = nn.Conv2d(512 * self.mult, 512 * self.mult, kernel_size=3,
                         stride=1, padding=2, dilation=2)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(2, stride=2, ceil_mode=True)
@@ -68,23 +76,23 @@ class Network(nn.Module):
 
 
         #lr 0.1 0.2 decay 1 0
-        self.conv1_1_down = nn.Conv2d(64, 21, 1)
-        self.conv1_2_down = nn.Conv2d(64, 21, 1)
+        self.conv1_1_down = nn.Conv2d(64 * self.mult, 21, 1)
+        self.conv1_2_down = nn.Conv2d(64 * self.mult, 21, 1)
 
-        self.conv2_1_down = nn.Conv2d(128, 21, 1)
-        self.conv2_2_down = nn.Conv2d(128, 21, 1)
+        self.conv2_1_down = nn.Conv2d(128 * self.mult, 21, 1)
+        self.conv2_2_down = nn.Conv2d(128 * self.mult, 21, 1)
 
-        self.conv3_1_down = nn.Conv2d(256, 21, 1)
-        self.conv3_2_down = nn.Conv2d(256, 21, 1)
-        self.conv3_3_down = nn.Conv2d(256, 21, 1)
+        self.conv3_1_down = nn.Conv2d(256 * self.mult, 21, 1)
+        self.conv3_2_down = nn.Conv2d(256 * self.mult, 21, 1)
+        self.conv3_3_down = nn.Conv2d(256 * self.mult, 21, 1)
 
-        self.conv4_1_down = nn.Conv2d(512, 21, 1)
-        self.conv4_2_down = nn.Conv2d(512, 21, 1)
-        self.conv4_3_down = nn.Conv2d(512, 21, 1)
+        self.conv4_1_down = nn.Conv2d(512 * self.mult, 21, 1)
+        self.conv4_2_down = nn.Conv2d(512 * self.mult, 21, 1)
+        self.conv4_3_down = nn.Conv2d(512 * self.mult, 21, 1)
 
-        self.conv5_1_down = nn.Conv2d(512, 21, 1)
-        self.conv5_2_down = nn.Conv2d(512, 21, 1)
-        self.conv5_3_down = nn.Conv2d(512, 21, 1)
+        self.conv5_1_down = nn.Conv2d(512 * self.mult, 21, 1)
+        self.conv5_2_down = nn.Conv2d(512 * self.mult, 21, 1)
+        self.conv5_3_down = nn.Conv2d(512 * self.mult, 21, 1)
 
         #lr 0.01 0.02 decay 1 0
         self.score_dsn1 = nn.Conv2d(21, 1, 1)
@@ -93,10 +101,10 @@ class Network(nn.Module):
         self.score_dsn4 = nn.Conv2d(21, 1, 1)
         self.score_dsn5 = nn.Conv2d(21, 1, 1)
 
-        self.weight_deconv2 =  make_bilinear_weights(4, 1).cuda()
-        self.weight_deconv3 =  make_bilinear_weights(8, 1).cuda()
-        self.weight_deconv4 =  make_bilinear_weights(16, 1).cuda()
-        self.weight_deconv5 =  make_bilinear_weights(16, 1).cuda()
+        self.weight_deconv2 =  make_bilinear_weights(4, 1).to(DEVICE)
+        self.weight_deconv3 =  make_bilinear_weights(8, 1).to(DEVICE)
+        self.weight_deconv4 =  make_bilinear_weights(16, 1).to(DEVICE)
+        self.weight_deconv5 =  make_bilinear_weights(16, 1).to(DEVICE)
 
 
         self.attention = CoFusion(5, 5)
@@ -117,7 +125,7 @@ class Network(nn.Module):
             else:
                 print("=> Initialize VGG16 backbone")
 
-                state_dict = torch.load(self.cfg.pretrained, map_location=torch.device("cpu"))
+                state_dict = torch.load(self.cfg.pretrained, map_location=torch.device("cuda"))
 
                 self_state_dict = self.state_dict()
                 for k, v in self_state_dict.items():
@@ -141,7 +149,11 @@ class Network(nn.Module):
 
     def forward(self, x):
         # VGG
-        img_H, img_W = x.shape[2], x.shape[3]
+        if len(x.shape) == 4:
+            img_H, img_W = x.shape[2], x.shape[3]
+        else:
+            print("Shape of input is not 4, exiting..")
+            exit()
         conv1_1 = self.relu(self.conv1_1(x))
         conv1_2 = self.relu(self.conv1_2(conv1_1))
         pool1   = self.maxpool(conv1_2)
@@ -206,7 +218,7 @@ class Network(nn.Module):
         results.append(fuse)
 
 
-        results = [torch.sigmoid(r) for r in results]
+        results = [r for r in results]
         return results
 
 
@@ -255,5 +267,5 @@ def make_bilinear_weights(size, num_channels):
 
 def upsample(input, stride, num_channels=1):
     kernel_size = stride * 2
-    kernel = make_bilinear_weights(kernel_size, num_channels).cuda()
+    kernel = make_bilinear_weights(kernel_size, num_channels).to(DEVICE)
     return torch.nn.functional.conv_transpose2d(input, kernel, stride=stride)

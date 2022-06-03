@@ -1,13 +1,13 @@
 import torch
 from .models.simple_unet import UNET
 from .models.ddrnet import DDRNet
-from .models.network.ocrnet import HRNet_Mscale
+from .models.network.ocrnet import HRNet_Mscale, HRNet_Mscale_v2
 #from .models.convnext_uperhead import convnext_uperhead
 import segmentation_models_pytorch as smp
 from torchsummary import summary
 
 ENCODER = "efficientnet-b0"
-ENCODER_WEIGHTS = "imagenet"
+ENCODER_WEIGHTS = None
 
 def get_model(args):
     if args.model == "unet":
@@ -41,7 +41,9 @@ def get_model(args):
     elif args.model == "ddrnet":
         return DDRNet(num_classes=args.num_classes)
     elif args.model == "mscale":
-        return HRNet_Mscale(num_classes=args.num_classes, criterion=None)
+        return HRNet_Mscale(num_classes=args.num_classes, num_channels=args.num_channels, criterion=None)
+    elif args.model == "mscale2":
+        return HRNet_Mscale_v2(num_classes=args.num_classes, criterion=None)
     #elif args.model == "convnext":
     #    return convnext_uperhead(args)
         

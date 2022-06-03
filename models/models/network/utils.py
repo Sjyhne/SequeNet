@@ -11,14 +11,14 @@ from . import hrnetv2 as hrnetv2
 
 from ..config import cfg
 
-def get_trunk(trunk_name, output_stride=8):
+def get_trunk(trunk_name, num_channels, output_stride=8):
     """
     Retrieve the network trunk and channel counts.
     """
     assert output_stride == 8, 'Only stride8 supported right now'
     
     if trunk_name == 'hrnetv2':
-        backbone = hrnetv2.get_seg_model()
+        backbone = hrnetv2.get_seg_model(num_channels)
         high_level_ch = backbone.high_level_ch
         s2_ch = -1
         s4_ch = -1
@@ -27,6 +27,22 @@ def get_trunk(trunk_name, output_stride=8):
 
     return backbone, s2_ch, s4_ch, high_level_ch
 
+def get_trunk_v2(trunk_name, output_stride=8):
+    """
+    Retrieve the network trunk and channel counts.
+    """
+    assert output_stride == 8, 'Only stride8 supported right now'
+    
+    if trunk_name == 'hrnetv2':
+        backbone = hrnetv2.get_seg_model(in_channels=3)
+        backbone2 = hrnetv2.get_seg_model(in_channels=1)
+        high_level_ch = backbone.high_level_ch
+        s2_ch = -1
+        s4_ch = -1
+    else:
+        raise 'unknown backbone {}'.format(trunk_name)
+
+    return backbone, backbone2, s2_ch, s4_ch, high_level_ch
 
 def BNReLU(ch):
     return nn.Sequential(

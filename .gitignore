@@ -134,3 +134,6 @@ logs
 model_output
 models/models/pretrainedweights
 models/models/convnext_base_1k_224_ema.pth
+cats_pretrained/
+pretrained/
+output/
