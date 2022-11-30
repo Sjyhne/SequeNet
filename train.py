@@ -21,9 +21,12 @@ def compute_metrics(logits, labs):
     lab_masks = labs
     miou = iou_pytorch(pred_masks, lab_masks)
     biou = calc_biou(pred_masks, lab_masks)
-    acc = ACCURACY(pred_masks, lab_masks)
+    #acc = ACCURACY(pred_masks, lab_masks)
     
-    acc = acc.cpu().numpy()
+    #acc = acc.cpu().numpy()
+    
+    acc = np.nan
+    
     miou = miou.cpu().numpy()
     
     if acc == np.nan:

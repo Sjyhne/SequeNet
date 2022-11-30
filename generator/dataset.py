@@ -21,7 +21,7 @@ class ImageDataset(torch.utils.data.Dataset):
     
     def get_label_path(self, path):
         tmp = path.split("/")
-        path = os.path.join(tmp[0], "inria_aerial_image_dataset", tmp[2], "edge_dir", "/".join(tmp[4:]))
+        path = os.path.join(tmp[0], "large_building_area", tmp[2], "ann_dir", "/".join(tmp[4:]))
         return path
     
     def get_label_paths(self):
@@ -71,9 +71,9 @@ class ImageDataset(torch.utils.data.Dataset):
             img = cv.imread(image_path)
         else:
             img = np.load(image_path)
-            
+        
         if not self.four_channels:
-            lab = cv.imread(label_path.replace("tif", "png"), cv.IMREAD_GRAYSCALE)
+            lab = cv.imread(label_path.replace("tiff", "tiff"), cv.IMREAD_GRAYSCALE)
         else:
             lab = cv.imread(label_path.replace("npy", "tiff"), cv.IMREAD_GRAYSCALE)
         #lab = lab.reshape(self.img_size[0], self.img_size[1], 1)

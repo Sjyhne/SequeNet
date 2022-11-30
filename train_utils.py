@@ -72,7 +72,7 @@ def display_and_store_metrics(train, eval, args):
 class ABLLoss(torch.nn.Module):
     def __init__(self, abl_weight = 1.0):
         super(ABLLoss, self).__init__()
-        self.cc = RMILoss(num_classes=2)
+        self.cc = torch.nn.CrossEntropyLoss()
         self.lovasz_softmax = LabelSmoothSoftmaxCEV1()
         self.abl = ABL()
         self.abl_weight = abl_weight

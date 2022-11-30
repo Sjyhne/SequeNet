@@ -44,8 +44,7 @@ https://github.com/divamgupta/image-segmentation-keras
 
 ## Benchmark command:
 
-> python train.py --epochs 50 --init_lr 3e-3 --image_dim 512 --num_channels 3 --model_type deeplab --batch_size 8 --data_path data/large_building_area/img_dir --data_percentage 1.0 --dataset l
-ba --main_loss cce
+> python train.py --epochs 50 --init_lr 3e-3 --image_dim 512 --num_channels 3 --model_type deeplab --batch_size 8 --data_path data/large_building_area/img_dir --data_percentage 1.0 --dataset lba --main_loss cce
 
 With the following values for each arg
 
