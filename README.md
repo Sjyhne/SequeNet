@@ -1,22 +1,19 @@
-# Segmentation Mask Post-Processing
-Segmentation mask post-processing using deep neural networks.
+# DeNISE: Deep Networks for Improved Segmentation Edges
 
-Todo when pull
+DeNISE is a technique for enhancing the training data for a segmentation network. The technique aims at improving the predicted segmentation edges, resulting in a cleaner and better segmentation mask.
 
-Create dirs:
-* logs
-* model_output
-* output_images
+The technique was specifically developed for building segmentation, aiming to acquire improved building delineations.
 
 
-## GOLDMINE
-https://github.com/divamgupta/image-segmentation-keras
+### Citation
 
+```
 
-## Example Scripts
+```
 
-#### Basic training script
+### Todo
 
+<<<<<<< HEAD
 > python train.py --epochs 10 --init_lr 1e-3 --image_dim 512 --num_channels 3 --model_type deeplab --batch_size 8 --data_path data/large_building_area/img_dir --data_percentage 0.1 --dataset lba --extra_model True --extra_model_type fcn_8
 
 
@@ -63,3 +60,5 @@ With the following values for each arg
 |label_smooth|0|
 |end_lr|1e-5|
 |lr_decay_power|0.5|
+
+* Clean up and create a good structure for the repository
